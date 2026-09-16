@@ -46,6 +46,41 @@ pnpm db:verify       # sanity-check the loaded database
 
 There is no test runner configured yet.
 
+## From-scratch setup
+
+Full prose version (Postgres install per-OS, etc.) is in `README.md`'s
+"From-scratch setup" section — this is the command sequence only, for
+bootstrapping a fresh checkout end to end:
+
+```bash
+# 1. Postgres must already be running with an empty database (README has
+#    per-OS install commands). Then:
+pnpm install
+cp .env.example .env
+# edit .env: set DATABASE_URL to that database; leave OPENROUTER_API_KEY /
+# NEXT_PUBLIC_DESMOS_API_KEY blank unless you have keys for them
+
+# 2. Schema
+pnpm contract:emit    # contract.prisma -> contract.json/.d.ts (must run before db init)
+pnpm prisma db init   # create tables from the contract
+
+# 3. Data pipeline — must run in this order, each stage reads only what the
+#    previous one wrote to disk (see scripts/README.md)
+pnpm scrape           # network, resumable — the only slow/network step
+pnpm convert:math     # code only, no network/AI
+pnpm load             # data/raw/ -> Postgres, no network
+pnpm db:verify        # must end with "All hard invariants passed." before continuing
+
+# 4. Run
+pnpm dev
+```
+
+Skipping straight to `pnpm dev` without steps 2–3 leaves every table empty
+(no build/type error — the app just has nothing to query), and skipping
+`contract:emit` before `db init` runs `db init` against stale generated
+files. If `db:verify` fails, stop and fix the pipeline rather than loading
+the app against a database you haven't confirmed is sane.
+
 ## Skills
 
 This repo has a large number of Skills installed under `.claude/skills/`
