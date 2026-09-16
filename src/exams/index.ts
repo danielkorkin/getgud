@@ -14,9 +14,10 @@
 
 import { validateBlueprint, type ExamBlueprint } from "./spec";
 import { SAT_PRACTICE_1 } from "./sat-practice-1";
+import { SAT_PRACTICE_2 } from "./sat-practice-2";
 import { SAT_SMOKE } from "./sat-smoke";
 
-const ALL_BLUEPRINTS: readonly ExamBlueprint[] = [SAT_PRACTICE_1, SAT_SMOKE];
+const ALL_BLUEPRINTS: readonly ExamBlueprint[] = [SAT_PRACTICE_1, SAT_PRACTICE_2, SAT_SMOKE];
 
 function assertRegistryInvariants(blueprints: readonly ExamBlueprint[]): void {
   for (const bp of blueprints) {

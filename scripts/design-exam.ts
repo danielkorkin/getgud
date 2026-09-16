@@ -14,11 +14,15 @@
 // `md5(seed || id)` is a stable pseudo-random total order that doesn't
 // depend on session state.
 //
-// The domain/band/SPR targets below are a reasoned design, not a script
-// parameter — see CLAUDE.md and the exam plan for how each number traces
-// back to College Board's published Assessment Framework shares. They are
-// written out explicitly (not derived by proportional rounding) so the
-// selection is exactly reproducible and easy to eyeball.
+// The domain/band/SPR/skill targets below are a reasoned design, not a
+// script parameter — see CLAUDE.md and the exam plan for how each number
+// traces back to College Board's published Assessment Framework shares (or,
+// for sat-practice-2's skill/hard-Module-2 tilts, to 2026 test-day recap
+// themes — see that design's own comment below). They are written out
+// explicitly (not derived by proportional rounding) so the selection is
+// exactly reproducible and easy to eyeball. Each committed exam's design
+// lives under its own key in `DESIGNS` (keyed by exam id) — adding a new
+// exam means adding a new key, never editing another exam's existing one.
 
 import { param } from "@prisma/orm-postgres/relational-core";
 import { db } from "../src/prisma/db";
@@ -49,6 +53,15 @@ interface ModuleDesign {
   domainBandTargets: DomainBandTargets;
   /** MATH only — per-domain SPR sub-quota, drawn from that domain's band allocation. Omit/empty for RW. */
   domainSprTargets?: Record<string, number>;
+  /**
+   * Optional per-domain skill sub-quota (RW or MATH): domainCode -> skillCode
+   * -> exact target count, summing to that domain's total (the sum of its
+   * domainBandTargets). When a domain has an entry here, `selectModule` uses
+   * a quota-respecting weighted round-robin over these targets instead of
+   * the default rarest-skill-first spread — see `buildQuotaRotationOrder`.
+   * A domain with no entry keeps today's rarity-based behavior untouched.
+   */
+  domainSkillTargets?: Record<string, Record<string, number>>;
 }
 
 function sumTargets(t: DomainBandTargets): number {
@@ -58,6 +71,12 @@ function sumTargets(t: DomainBandTargets): number {
       total += count ?? 0;
     }
   }
+  return total;
+}
+
+function domainTotal(t: DomainBandTargets, domain: string): number {
+  let total = 0;
+  for (const count of Object.values(t[domain] ?? {})) total += count ?? 0;
   return total;
 }
 
@@ -142,18 +161,129 @@ const MATH_MODULE_2_UPPER: ModuleDesign = {
   domainSprTargets: { H: 2, P: 2, Q: 1, S: 1 },
 };
 
-const SECTIONS: Record<SectionCode, Record<ModuleName, ModuleDesign>> = {
+const SAT_PRACTICE_1_SECTIONS: Record<SectionCode, Record<ModuleName, ModuleDesign>> = {
   RW: { module1: RW_MODULE_1, module2Lower: RW_MODULE_2_LOWER, module2Upper: RW_MODULE_2_UPPER },
   MATH: { module1: MATH_MODULE_1, module2Lower: MATH_MODULE_2_LOWER, module2Upper: MATH_MODULE_2_UPPER },
 };
 
+// ── sat-practice-2 ──────────────────────────────────────────────────────────
+// Same official-blueprint shape as sat-practice-1 (domain counts, module1 and
+// module2Lower band curves, SPR counts, timing) — this is deliberately NOT a
+// harder-difficulty test overall. Two things differ, both informed by 2026
+// test-day recap themes (informal, vendor/student-recall sourced, form-
+// dependent — NOT official College Board data; see sat-practice-2.ts's file
+// comment):
+//   1. `domainSkillTargets` tilts the within-domain skill mix for the four
+//      domains the recaps repeatedly single out — RW's CAS (vocabulary/Words
+//      in Context) and EOI (transitions over rhetorical synthesis), Math's H
+//      (mild systems/linear-function tilt) and P (heavy nonlinear-function
+//      tilt). Every other domain (RW's INI/SEC, Math's Q/S) is left unset —
+//      no clear per-skill signal in the recaps, or (Q/S) too few slots (3)
+//      to sub-target without starving skills the recaps don't single out.
+//      Deliberately NOT upweighting Q.F (margin of error) — recap evidence
+//      for that specific claim was explicitly absent.
+//   2. module2Upper's band curve (both sections) is hardened relative to
+//      sat-practice-1 — "the real test feels harder than Bluebook, especially
+//      Module 2" is the one pattern the recaps flag as recurring across many
+//      independent test dates. module1 and module2Lower keep sat-practice-1's
+//      exact band curves so the routing threshold isn't being second-guessed
+//      by a difficulty change underneath it.
+const RW_MODULE_1_V2: ModuleDesign = {
+  ...RW_MODULE_1,
+  domainSkillTargets: {
+    CAS: { WIC: 5, TSP: 2, CTC: 1 }, // vocabulary-heavy Craft & Structure
+    EOI: { TRA: 3, SYN: 2 }, // transitions over rhetorical synthesis
+  },
+};
+const RW_MODULE_2_LOWER_V2: ModuleDesign = {
+  ...RW_MODULE_2_LOWER,
+  domainSkillTargets: {
+    CAS: { WIC: 5, TSP: 2, CTC: 1 },
+    EOI: { TRA: 3, SYN: 2 },
+  },
+};
+const RW_MODULE_2_UPPER_V2: ModuleDesign = {
+  count: 27,
+  domainOrder: RW_DOMAIN_ORDER,
+  // Hardened vs. sat-practice-1's {3:1,4:4,5:6,6:8,7:8} (col sums {4:2,5:5,
+  // 6:9,7:11}, still 27) — "Module 2 feels harder than Bluebook" recap theme.
+  domainBandTargets: {
+    CAS: { 4: 1, 5: 1, 6: 3, 7: 3 }, // 8
+    INI: { 4: 1, 5: 1, 6: 3, 7: 2 }, // 7
+    SEC: { 5: 1, 6: 2, 7: 4 }, // 7
+    EOI: { 5: 2, 6: 1, 7: 2 }, // 5
+  },
+  domainSkillTargets: {
+    CAS: { WIC: 5, TSP: 2, CTC: 1 },
+    EOI: { TRA: 3, SYN: 2 },
+  },
+};
+
+const MATH_MODULE_1_V2: ModuleDesign = {
+  ...MATH_MODULE_1,
+  domainSkillTargets: {
+    H: { "H.A.": 1, "H.B.": 2, "H.C.": 2, "H.D.": 2, "H.E.": 1 }, // mild systems/linear-function tilt
+    P: { "P.A.": 1, "P.B.": 3, "P.C.": 4 }, // heavy nonlinear-function/equation tilt
+  },
+};
+const MATH_MODULE_2_LOWER_V2: ModuleDesign = {
+  ...MATH_MODULE_2_LOWER,
+  domainSkillTargets: {
+    H: { "H.A.": 1, "H.B.": 2, "H.C.": 2, "H.D.": 2, "H.E.": 1 },
+    P: { "P.A.": 1, "P.B.": 3, "P.C.": 4 },
+  },
+};
+const MATH_MODULE_2_UPPER_V2: ModuleDesign = {
+  count: 22,
+  domainOrder: MATH_DOMAIN_ORDER,
+  // Hardened vs. sat-practice-1's {3:1,4:4,5:4,6:6,7:7} (col sums {4:2,5:4,
+  // 6:7,7:9}, still 22) — same "harder Module 2" recap theme as RW above.
+  domainBandTargets: {
+    H: { 4: 1, 5: 2, 6: 2, 7: 3 }, // 8
+    P: { 4: 1, 5: 1, 6: 3, 7: 3 }, // 8
+    Q: { 5: 1, 6: 1, 7: 1 }, // 3
+    S: { 6: 1, 7: 2 }, // 3
+  },
+  domainSprTargets: { H: 2, P: 2, Q: 1, S: 1 },
+  domainSkillTargets: {
+    H: { "H.A.": 1, "H.B.": 2, "H.C.": 2, "H.D.": 2, "H.E.": 1 },
+    P: { "P.A.": 1, "P.B.": 3, "P.C.": 4 },
+  },
+};
+
+const SAT_PRACTICE_2_SECTIONS: Record<SectionCode, Record<ModuleName, ModuleDesign>> = {
+  RW: { module1: RW_MODULE_1_V2, module2Lower: RW_MODULE_2_LOWER_V2, module2Upper: RW_MODULE_2_UPPER_V2 },
+  MATH: { module1: MATH_MODULE_1_V2, module2Lower: MATH_MODULE_2_LOWER_V2, module2Upper: MATH_MODULE_2_UPPER_V2 },
+};
+
+// Design intent, keyed by exam id — NOT a CLI parameter (see the module
+// comment). `sat-practice-1`'s entry is untouched by the sat-practice-2 work
+// above; regenerating it with the same seed must still reproduce the exact
+// committed ids.
+const DESIGNS: Record<string, Record<SectionCode, Record<ModuleName, ModuleDesign>>> = {
+  "sat-practice-1": SAT_PRACTICE_1_SECTIONS,
+  "sat-practice-2": SAT_PRACTICE_2_SECTIONS,
+};
+
 // Sanity-check the hand-authored designs at load time — a typo here would
-// otherwise silently produce a module short of its contractual count.
-for (const [sectionCode, modules] of Object.entries(SECTIONS)) {
-  for (const [moduleName, design] of Object.entries(modules)) {
-    const sum = sumTargets(design.domainBandTargets);
-    if (sum !== design.count) {
-      throw new Error(`${sectionCode}.${moduleName}: domainBandTargets sums to ${sum}, expected ${design.count}`);
+// otherwise silently produce a module short of its contractual count, or a
+// domainSkillTargets that doesn't actually cover its domain's slots.
+for (const [examId, sections] of Object.entries(DESIGNS)) {
+  for (const [sectionCode, modules] of Object.entries(sections)) {
+    for (const [moduleName, design] of Object.entries(modules)) {
+      const sum = sumTargets(design.domainBandTargets);
+      if (sum !== design.count) {
+        throw new Error(`${examId}.${sectionCode}.${moduleName}: domainBandTargets sums to ${sum}, expected ${design.count}`);
+      }
+      for (const [domain, skillTargets] of Object.entries(design.domainSkillTargets ?? {})) {
+        const skillSum = Object.values(skillTargets).reduce((a, b) => a + b, 0);
+        const expected = domainTotal(design.domainBandTargets, domain);
+        if (skillSum !== expected) {
+          throw new Error(
+            `${examId}.${sectionCode}.${moduleName}.${domain}: domainSkillTargets sums to ${skillSum}, expected domain total ${expected}`,
+          );
+        }
+      }
     }
   }
 }
@@ -261,6 +391,43 @@ function rankSkillsByRarity(pool: Candidate[], domain: string): string[] {
   return [...bySkill.entries()].sort((a, b) => a[1] - b[1]).map(([skill]) => skill);
 }
 
+/**
+ * Skill rotation order for a domain with explicit `domainSkillTargets` — a
+ * weighted round-robin over the requested quotas (interleaved, e.g.
+ * `WIC,TSP,WIC,CTC,WIC,TSP,WIC,WIC`, never blocked as `WIC×5,TSP×2,CTC×1`)
+ * so a thin quota isn't crowded to one end of the domain's picks. Skills are
+ * read in sorted-by-code order first so ties resolve deterministically
+ * regardless of the source object's declaration order — that ordering is
+ * then part of the committed exam's reproducibility contract, same as any
+ * other design constant here. At each step, picks whichever skill has made
+ * the least proportional progress toward its own quota (issued/target),
+ * ties broken by sorted-code order.
+ */
+function buildQuotaRotationOrder(skillTargets: Record<string, number>): string[] {
+  const skills = Object.keys(skillTargets).sort();
+  const remaining = new Map(skills.map((s) => [s, skillTargets[s] ?? 0]));
+  const issued = new Map(skills.map((s) => [s, 0]));
+  const total = skills.reduce((sum, s) => sum + (skillTargets[s] ?? 0), 0);
+  const order: string[] = [];
+  for (let i = 0; i < total; i++) {
+    let best: string | null = null;
+    let bestRatio = Infinity;
+    for (const s of skills) {
+      if ((remaining.get(s) ?? 0) <= 0) continue;
+      const ratio = (issued.get(s) ?? 0) / (skillTargets[s] ?? 1);
+      if (best === null || ratio < bestRatio) {
+        best = s;
+        bestRatio = ratio;
+      }
+    }
+    if (!best) break; // shouldn't happen if `remaining` sums correctly
+    order.push(best);
+    remaining.set(best, (remaining.get(best) ?? 0) - 1);
+    issued.set(best, (issued.get(best) ?? 0) + 1);
+  }
+  return order;
+}
+
 interface SkillRotation {
   order: string[];
   index: number;
@@ -355,7 +522,11 @@ function selectModule(pool: Candidate[], design: ModuleDesign, state: SelectionS
     const domainSprTarget = design.domainSprTargets?.[domain] ?? 0;
     let sprStillNeeded = domainSprTarget;
     const domainPicked: Candidate[] = [];
-    const rotation: SkillRotation = { order: rankSkillsByRarity(pool, domain), index: 0 };
+    const skillTargets = design.domainSkillTargets?.[domain];
+    const rotation: SkillRotation = {
+      order: skillTargets ? buildQuotaRotationOrder(skillTargets) : rankSkillsByRarity(pool, domain),
+      index: 0,
+    };
 
     const bands = Object.keys(bandTargets)
       .map(Number)
@@ -372,12 +543,25 @@ function selectModule(pool: Candidate[], design: ModuleDesign, state: SelectionS
       let gotSpr = picked.filter((c) => c.type === "spr").length;
       for (let i = 0; i < picked.length && gotSpr < sprHere; i++) {
         if (picked[i]!.type === "spr") continue;
-        const sprReplacement = pool.find(
-          (c) => c.domainCode === domain && c.scoreBand === band && c.type === "spr" && isAvailable(c, state),
-        );
+        const discarded = picked[i]!;
+        // When this domain has explicit skill quotas, prefer a same-skill
+        // SPR replacement first so the swap can't silently break the quota
+        // by handing a different skill's SPR to a domain that's tracking
+        // per-skill counts. Gated behind `skillTargets` so sat-practice-1
+        // (which never sets domainSkillTargets) is byte-for-byte unaffected.
+        const sprReplacement =
+          (skillTargets &&
+            pool.find(
+              (c) =>
+                c.domainCode === domain &&
+                c.scoreBand === band &&
+                c.type === "spr" &&
+                c.skillCode === discarded.skillCode &&
+                isAvailable(c, state),
+            )) ||
+          pool.find((c) => c.domainCode === domain && c.scoreBand === band && c.type === "spr" && isAvailable(c, state));
         if (sprReplacement) {
           // Un-claim the MCQ we're discarding, claim the SPR instead.
-          const discarded = picked[i]!;
           state.used.delete(discarded.id);
           picked[i] = sprReplacement;
           claim(sprReplacement, state);
@@ -480,6 +664,15 @@ function printSummary(sectionCode: SectionCode, moduleName: ModuleName, result: 
 }
 
 async function runDesign(examId: string, seed: string): Promise<void> {
+  // Every --exam value must have a corresponding entry in DESIGNS — an
+  // unrecognized id throws here rather than silently falling back to
+  // sat-practice-1's design (the same "don't paper over a typo" philosophy
+  // as the domainBandTargets sum check above).
+  const sections = DESIGNS[examId];
+  if (!sections) {
+    throw new Error(`No design in DESIGNS for --exam=${examId}. Known designs: ${Object.keys(DESIGNS).join(", ")}`);
+  }
+
   // Redesigning an already-registered exam may freely reuse (or drop) that
   // exam's own current ids — only ids belonging to OTHER blueprints are
   // off-limits. Designing a brand-new --exam name (not yet registered)
@@ -503,7 +696,7 @@ async function runDesign(examId: string, seed: string): Promise<void> {
     const pool = await fetchCandidates(sectionCode, seed, excludeIds);
     console.log(`\n=== ${sectionCode}: ${pool.length} eligible candidates ===`);
     for (const moduleName of ["module1", "module2Lower", "module2Upper"] as const) {
-      const design = SECTIONS[sectionCode][moduleName];
+      const design = sections[sectionCode][moduleName];
       const result = selectModule(pool, design, state);
       output[sectionCode][moduleName] = result.ids;
       printSummary(sectionCode, moduleName, result);
