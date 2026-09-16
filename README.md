@@ -1,36 +1,44 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Getgud
 
-## Getting Started
+A local, self-hostable PSAT/SAT practice tool. Practice questions are sourced
+from the College Board Question Bank — see [ATTRIBUTION.md](./ATTRIBUTION.md).
 
-First, run the development server:
+## Status
+
+The data pipeline is implemented: a full SAT and PSAT/NMSQT & PSAT 10 scrape,
+a code-only equation-image-to-LaTeX conversion pass, and a Postgres loader —
+see [scripts/README.md](./scripts/README.md). The practice-tool UI itself
+hasn't been built yet. See [CLAUDE.md](./CLAUDE.md) for the current state of
+the codebase.
+
+## Getting started
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
+cp .env.example .env   # then fill in DATABASE_URL
+pnpm contract:emit
+pnpm prisma db init
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Loading question data
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+pnpm scrape          # College Board -> data/raw/ (resumable; only fetches what's missing)
+pnpm convert:math    # equation images -> LaTeX, code only, no network/AI
+pnpm load            # data/raw/ -> Postgres
+pnpm db:verify        # sanity-check the result
+```
 
-## Learn More
+See [scripts/README.md](./scripts/README.md) for what each stage does and
+[ATTRIBUTION.md](./ATTRIBUTION.md) for sourcing details. `data/` is
+gitignored — nothing scraped is committed or redistributed.
 
-To learn more about Next.js, take a look at the following resources:
+## Stack
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [Next.js](https://nextjs.org) (App Router)
+- [Prisma ORM](https://www.prisma.io) (v8, PostgreSQL)
+- [shadcn/ui](https://ui.shadcn.com) on [Base UI](https://base-ui.com), Tailwind CSS v4
+- [AI SDK](https://ai-sdk.dev) — dependency installed, not yet wired up

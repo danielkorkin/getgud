@@ -12,6 +12,16 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored agent skills, not app source:
+    ".agents/**",
+    ".claude/**",
+    ".cursor/**",
+    ".devin/**",
+    // Generated Prisma contract files (see .gitattributes):
+    "src/prisma/contract.json",
+    "src/prisma/contract.d.ts",
+    "migrations/snapshots/**/contract.json",
+    "migrations/snapshots/**/contract.d.ts",
   ]),
 ]);
 

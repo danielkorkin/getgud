@@ -1,0 +1,111 @@
+// use prisma-8
+
+// ─── College Board Question Bank ────────────────────────────────────────────
+// Scraped from the College Board educator Question Bank (SAT + PSAT/NMSQT &
+// PSAT 10 — see ATTRIBUTION.md). Two-table split:
+//
+//   Question            one row per unique question (content), keyed by its
+//                       natural id: external_id when present, else ibn.
+//   QuestionAssessment  one row per (assessment × question) placement. This
+//                       metadata is NOT question-scoped — `difficulty` and
+//                       `scoreBand` diverge between the SAT and PSAT banks for
+//                       the same question, so they cannot live on Question.
+//
+// No column-level @map: field name == column name, so the db.orm lane (field
+// names) and the db.sql lane (storage column names) share one vocabulary.
+// Tables ARE @@map'd to snake_case for a friendlier psql experience.
+//
+// Timestamp fields use TimestamptzString, not DateTime/Timestamptz: Node
+// 26.8.1 (the version this repo runs on) has no globalThis.Temporal, and the
+// Temporal-backed codecs throw RUNTIME.TEMPORAL_UNAVAILABLE on first read or
+// write. TimestamptzString is a pass-through to the same `timestamptz`
+// column — switch types later (with temporal-polyfill) without a migration.
+
+model Question {
+  // external_id (UUID) when present, else ibn ("022222-DC"). The two formats
+  // are disjoint, so the natural key needs no prefix.
+  id         String  @id
+  externalId String? @unique
+  ibn        String? @unique
+
+  contentSource String // 'qbank' (POST /get-question) | 'saic' (disclosed/{ibn}.json)
+  type          String // 'mcq' | 'spr'
+
+  stem      String
+  stimulus  String?
+  rationale String?
+
+  // MCQ: [{ id, content, letter }]. NULL for spr.
+  answerOptions Jsonb?
+  // Raw `keys`. MCQ: answerOption ids. SPR: the accepted literal answer(s).
+  correctKeys   String[]
+  // Raw `correct_answer`. MCQ: ["B"]. SPR: ["403"].
+  correctAnswer String[]
+
+  // Promoted optional detail keys — present on roughly two-thirds of qbank
+  // items, absent from the rest and from every saic item. Nullable by nature.
+  vaultId             String?
+  origin              String?
+  templateClusterId   String?
+  templateClusterName String?
+  parentTemplateId    String?
+  parentTemplateName  String?
+  positionIndex       Int? // upstream key is `position`; avoided as a column name
+
+  // Verbatim detail payload. The key set varies per item — this is what
+  // guarantees "retain full info" holds even when the shape drifts.
+  raw         Jsonb
+  contentHash String // sha256 of the canonicalized raw payload; cheap change detection
+
+  // True when stem/stimulus/rationale/answerOptions still embed a base64
+  // <img class="math-img"> after normalization. Only possible for
+  // contentSource='saic': College Board's disclosed-item format renders some
+  // equations as pre-rendered images with no alt-text description at all, so
+  // there is no text to substitute and the image is kept rather than the
+  // content silently dropped. contentSource='qbank' items carry real MathML
+  // and are never affected.
+  hasEmbeddedMathImages Boolean @default(false)
+
+  fetchedAt TimestamptzString @default(now())
+
+  placements QuestionAssessment[]
+
+  @@map("question")
+  @@index([type])
+  @@index([contentSource])
+}
+
+model QuestionAssessment {
+  assessment String // 'SAT' | 'PSAT/NMSQT & PSAT 10'
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  asmtEventId Int // 99 | 100
+  program     String // row.program: 'SAT' | 'P10'
+  section     Int // 1 = Reading and Writing, 2 = Math
+  sectionCode String // 'RW' | 'MATH'
+
+  domainCode String // primary_class_cd: INI CAS EOI SEC H P Q S
+  domainDesc String // primary_class_cd_desc
+  skillCode  String // skill_cd
+  skillDesc  String // skill_desc, normalized (upstream casing is inconsistent)
+
+  difficulty String // 'E' | 'M' | 'H' — assessment-scoped; the whole reason for the split
+  scoreBand  Int? // score_band_range_cd, 1-7
+
+  bankQuestionId String // upstream `questionId` — bank-local 8-hex, NOT the join key
+  uId            String?
+  pPcc           String? // e.g. "SAT#INI"
+
+  createDate TimestamptzString?
+  updateDate TimestamptzString?
+
+  listRaw Jsonb // verbatim list row
+
+  @@id([assessment, questionId])
+  @@map("question_assessment")
+  @@index([questionId])
+  @@index([assessment, section, domainCode, skillCode], name: "qa_asmt_section_domain_skill")
+  @@index([assessment, difficulty])
+  @@index([bankQuestionId])
+}
