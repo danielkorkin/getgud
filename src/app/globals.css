@@ -199,3 +199,11 @@
     animation: none;
   }
 }
+
+/* Practice-runner text highlighting (CSS Custom Highlight API) — the
+   ::highlight() pseudo-element rule that paints it lives in
+   src/components/practice/highlightable.tsx as a runtime <style> tag, not
+   here: Turbopack's build-time CSS parser (Lightning CSS) doesn't yet
+   recognize ::highlight() and fails the production build on it, even
+   though every ::highlight()-supporting browser parses it fine at
+   runtime. */

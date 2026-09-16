@@ -7,19 +7,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 Getgud is a local, self-hostable PSAT/SAT practice tool: a Next.js app backed
-by Postgres via Prisma, an AI SDK integration (model provider not yet
-chosen), and a scraper that imports questions from the College Board
-Question Bank (see `ATTRIBUTION.md`).
+by Postgres via Prisma, an AI SDK integration (OpenRouter, model configurable
+via `OPENROUTER_MODEL`), and a scraper that imports questions from the
+College Board Question Bank (see `ATTRIBUTION.md`).
 
-**Current state: data pipeline done, practice-tool UI not started.** The
+**Current state: data pipeline and practice-tool UI both done.** The
 `Question` / `QuestionAssessment` contract, the scraper, the math-image →
-LaTeX conversion pipeline, and the loader are all implemented and have been
-run end-to-end against a local Postgres — see `scripts/README.md` for the
+LaTeX conversion pipeline, and the loader are implemented and have been run
+end-to-end against a local Postgres — see `scripts/README.md` for the
 pipeline stages and `ATTRIBUTION.md` for what's scraped and how equations are
-converted. What does **not** exist yet: any practice-tool page, component, or
-API route, and the AI SDK integration (the `ai` package is installed but
-unwired). Don't assume UI/app-layer domain logic exists; check before
-referencing it — the data layer is the only part that's real so far.
+converted. On top of that: a practice-set builder (`/new`), a Bluebook-style
+runner (`/sets/[id]`) with answer eliminator, mark-for-review, text
+highlighting + notes, a Desmos calculator, an AI hint panel, and instant
+per-question feedback rendered from the College Board rationale; a set
+library (`/sets`) and results screen (`/sets/[id]/results`); local
+cookie-based profiles (no auth); and two API routes (`/api/hint` streaming,
+`/api/events` telemetry ingest). See "Practice-tool app layer" below for the
+data model and load-bearing gotchas.
 
 ## Commands
 
@@ -63,7 +67,10 @@ version via `prisma skills sync`, so it's more current than training data
 or `prisma-8.md` (root-level, quickstart-only) alone.
 
 The short version:
-- `src/prisma/contract.prisma` is the source of truth for models (currently empty).
+- `src/prisma/contract.prisma` is the source of truth for models — the
+  College Board `Question` / `QuestionAssessment` pair plus the app-owned
+  practice-tool models (`Profile`, `PracticeSet`, `PracticeSetItem`,
+  `Attempt`, `AttemptEvent`, `QuestionHint`, `AttemptHint`).
 - `pnpm contract:emit` compiles it into `src/prisma/contract.json` (data) and
   `src/prisma/contract.d.ts` (types) — both are committed, generated files
   (see `.gitattributes`), never hand-edited.
@@ -119,6 +126,67 @@ implicit-multiplication rule in `spoken-math.ts` silently turned prose like
 not just a coverage change, and check for that failure mode (a real English
 word landing untranslated in the LaTeX output) before widening what the
 grammar accepts.
+
+## Practice-tool app layer
+
+Server Actions live in `src/actions/` (`profile.ts`, `sets.ts`,
+`attempts.ts`); the two route handlers are `src/app/api/{hint,events}/route.ts`.
+Rendering (MathML/LaTeX → KaTeX, sanitized) is `src/lib/content/render.ts` —
+see its file comment and `src/lib/content/latex-hygiene.ts` for the small,
+verified fixup pass it applies before handing LaTeX to KaTeX. Question
+generation/sampling is `src/lib/query/generate-set.ts`.
+
+**`Attempt.id` always equals its `PracticeSetItem.id`, by convention, not a
+schema constraint.** `.upsert()` on this ORM conflict-targets the row's
+*primary key*, not an arbitrary unique column — keying `Attempt` any other
+way (e.g. a fresh `crypto.randomUUID()` with `itemId` as a separate unique
+column) makes `upsert()` silently fail to update on a second view. Every
+action that reads/writes an `Attempt` looks it up by `{ id: item.id }`.
+
+**Every Server Action / route handler that takes `(setId, position)` must
+re-derive ownership itself** — `src/lib/access.ts`'s `getOwnedItem()` (or
+`src/lib/profile.ts`'s `requireProfileId()`) does this; never trust a bare id
+from the client. "No password" profiles are still not "no authorization."
+
+**`db.raw.sql` + `param(...)` from `@prisma/orm-postgres/relational-core`
+does not work when called from code reachable through a Route Handler
+(`app/api/*/route.ts`) under Turbopack dev** — it throws
+`RUNTIME.RAW_SQL_UNSUPPORTED_INTERPOLATION` even for a query that works
+byte-for-byte from a Server Action or a plain script (Route Handlers and
+Server Actions land in different Turbopack dev bundles, and the ParamRef
+only satisfies the interpolation check within the bundle that produced it).
+Moving the raw-SQL call into its own module doesn't help — it's keyed by
+the request's entrypoint, not which file the code lives in. Fix: use the
+ORM (`db.orm.public.<Model>.create(...)`) from anything invoked via a route
+handler, not `db.raw.sql`/`param()`. See `src/lib/ingest-events.ts`'s file
+comment. (`generate-set.ts`'s `param()` usage is fine — everything there
+runs through Server Actions.)
+
+**Base UI's `ToggleGroup` defaults to `multiple={false}` (single-select)** —
+unlike Radix's `type="multiple"` convention. Forgetting `multiple` on a
+multi-select toggle group (see `set-builder-form.tsx`) makes every click
+collapse the group to just the clicked item, with no error.
+
+**`@phosphor-icons/react`'s default export is client-only** — importing it
+in a Server Component (a page with no `"use client"`) crashes the build with
+`(0, b.createContext) is not a function`. Server Components must import from
+`@phosphor-icons/react/dist/ssr` instead (same icon names). Client components
+use the bare import, matching the installed `shadcn/ui` components.
+
+**Icons need an explicit `size-*` class outside a shadcn `Button`.**
+`Button`'s own class list carries a Tailwind arbitrary-variant rule
+(`[&_svg:not([class*='size-'])]:size-4`) that auto-sizes any icon rendered
+as its child — icons inside custom hand-rolled interactive elements (a
+plain `<button>`, a `CollapsibleTrigger`, etc.) don't get that rule and
+render at Phosphor's unconstrained intrinsic size (visually enormous) unless
+you add `size-4` (or similar) yourself.
+
+**`::highlight()` (the CSS Custom Highlight API, used for passage/stem text
+highlighting in the runner) fails a production build if it's in
+`globals.css`** — Turbopack's build-time CSS parser (Lightning CSS) doesn't
+recognize the pseudo-element yet, even though every browser that implements
+the API parses it fine at runtime. The rule lives in
+`highlightable.tsx` as a runtime `<style>` tag instead.
 
 ## Repo layout notes
 

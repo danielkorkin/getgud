@@ -3,6 +3,10 @@ import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
+// KaTeX only ever runs server-side (src/lib/content/render.ts), but its
+// output HTML still needs this stylesheet (and the ~60 font files it pulls
+// in) to render correctly in the browser — import it once, globally.
+import "katex/dist/katex.min.css";
 
 const geistSans = Geist({
   variable: "--font-sans",

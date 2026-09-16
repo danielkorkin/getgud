@@ -69,6 +69,9 @@ model Question {
   fetchedAt TimestamptzString @default(now())
 
   placements QuestionAssessment[]
+  setItems   PracticeSetItem[]
+  attempts   Attempt[]
+  hints      QuestionHint[]
 
   @@map("question")
   @@index([type])
@@ -108,4 +111,220 @@ model QuestionAssessment {
   @@index([assessment, section, domainCode, skillCode], name: "qa_asmt_section_domain_skill")
   @@index([assessment, difficulty])
   @@index([bankQuestionId])
+}
+
+// ─── Practice tool ──────────────────────────────────────────────────────────
+// Everything below is app-owned state layered on top of the College Board
+// data above. PracticeSetItem and Attempt deliberately SNAPSHOT the facet
+// values (sectionCode/domainCode/skillCode/difficulty/scoreBand/type) off
+// QuestionAssessment at generation/answer time rather than joining live —
+// a future `pnpm load` re-run must never retroactively rewrite history.
+//
+// Same conventions as above: no column-level @map (db.orm field names ==
+// db.sql column names), tables @@map'd to snake_case, timestamps are
+// TimestamptzString, ids are app-generated (crypto.randomUUID()).
+
+model Profile {
+  id         String            @id
+  name       String            @unique
+  accent     String? // UI accent token, e.g. a tag-color name
+  createdAt  TimestamptzString @default(now())
+  lastSeenAt TimestamptzString @default(now())
+
+  practiceSets PracticeSet[]
+  attempts     Attempt[]
+
+  @@map("profile")
+}
+
+model PracticeSet {
+  id        String  @id
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  name   String
+  status String // 'in_progress' | 'completed' | 'abandoned'
+  mode   String // 'practice' — the only mode implemented today; reserved for a future 'timed'
+
+  // Full generator spec (assessment, sections, difficulties, domains/skills,
+  // scoreBands, types, excludeAttempted, length) — replaying/regenerating a
+  // set reads only this.
+  config Jsonb
+
+  // Denormalized from `config` for cheap list-view filtering without parsing it.
+  assessment   String
+  sectionCodes String[]
+  difficulties String[]
+
+  questionCount Int
+  currentIndex  Int @default(0)
+
+  correctCount  Int @default(0)
+  gradedCount   Int @default(0)
+  totalActiveMs Int @default(0)
+
+  createdAt   TimestamptzString @default(now())
+  startedAt   TimestamptzString?
+  completedAt TimestamptzString?
+
+  items    PracticeSetItem[]
+  attempts Attempt[]
+
+  @@map("practice_set")
+  @@index([profileId, status])
+}
+
+model PracticeSetItem {
+  id       String      @id
+  setId    String
+  set      PracticeSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+  position Int
+
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  assessment String // which QuestionAssessment placement (SAT vs PSAT) this item was generated from
+
+  // Snapshot of QuestionAssessment facets at generation time.
+  sectionCode String
+  domainCode  String
+  skillCode   String
+  difficulty  String
+  scoreBand   Int?
+  type        String
+  gradable    Boolean // false when the source question has no published correctAnswer
+
+  attempt Attempt?
+
+  @@unique([setId, position])
+  @@map("practice_set_item")
+  @@index([questionId])
+}
+
+model Attempt {
+  id     String          @id
+  itemId String          @unique
+  item   PracticeSetItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  setId String
+  set   PracticeSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  // Facet snapshot, denormalized so a future stats screen groups by skill
+  // with zero joins.
+  assessment    String
+  sectionCode   String
+  domainCode    String
+  skillCode     String
+  difficulty    String
+  scoreBand     Int?
+  type          String
+  contentSource String
+
+  // Response
+  status           String // 'unanswered' | 'answered' | 'skipped'
+  selectedOptionId String?
+  selectedLetter   String?
+  spResponse       String?
+  spNormalized     String?
+  isCorrect        Boolean?
+  gradable         Boolean
+
+  // Timing
+  firstViewedAt       TimestamptzString?
+  firstInputAt        TimestamptzString?
+  submittedAt         TimestamptzString?
+  activeMs            Int @default(0) // visible + focused time only
+  totalMs             Int @default(0)
+  timeToFirstInputMs  Int?
+  timeAfterFeedbackMs Int @default(0) // time spent reading the rationale after submit
+  visitCount          Int @default(0)
+  answerChangeCount   Int @default(0)
+
+  // Tools
+  markedForReview     Boolean  @default(false)
+  eliminatedOptionIds String[] @default([])
+  eliminationCount    Int      @default(0)
+  hintsUsed           Int      @default(0)
+  maxHintLevel        Int      @default(0)
+  calculatorOpened    Boolean  @default(false)
+  calculatorOpenMs    Int      @default(0)
+  referenceOpened     Boolean  @default(false)
+  highlightCount      Int      @default(0)
+  highlights          Jsonb? // [{ start, end, text, color, createdAt }]
+  notes               String?
+
+  events AttemptEvent[]
+  hints  AttemptHint[]
+
+  @@map("attempt")
+  @@index([profileId, submittedAt])
+  @@index([profileId, skillCode])
+  @@index([profileId, questionId])
+  @@index([setId])
+}
+
+model AttemptEvent {
+  id        String  @id
+  attemptId String
+  attempt   Attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  // Denormalized for querying the event stream without joining back to Attempt.
+  profileId  String
+  setId      String
+  questionId String
+
+  seq Int // monotonic per attempt, assigned client-side — the idempotency key
+
+  type     String // view_enter | view_exit | focus | blur | select_option | change_option |
+  // eliminate_option | restore_option | mark_review | hint_request | hint_shown |
+  // calc_open | calc_close | reference_open | highlight_add | highlight_remove |
+  // note_save | submit | reveal_feedback | nav_next | nav_prev | nav_jump |
+  // set_start | set_complete
+  atMs     Int // ms since attempt start, client clock
+  clientAt TimestamptzString
+
+  payload Jsonb?
+
+  @@unique([attemptId, seq])
+  @@map("attempt_event")
+  @@index([attemptId])
+}
+
+// AI hint cache — shared across profiles so a given (question, level) is
+// generated once, not once per profile.
+model QuestionHint {
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  level      Int // 1 = nudge, 2 = approach, 3 = near-solution
+
+  content   String
+  model     String // OpenRouter model id that generated this hint, for future re-gen/audit
+  createdAt TimestamptzString @default(now())
+
+  attemptHints AttemptHint[]
+
+  @@id([questionId, level])
+  @@map("question_hint")
+}
+
+model AttemptHint {
+  id String @id
+
+  attemptId String
+  attempt   Attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  questionId String
+  level      Int
+  hint       QuestionHint @relation(fields: [questionId, level], references: [questionId, level], onDelete: Cascade)
+
+  requestedAt TimestamptzString @default(now())
+
+  @@unique([attemptId, questionId, level])
+  @@map("attempt_hint")
+  @@index([attemptId])
 }

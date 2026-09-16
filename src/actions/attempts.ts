@@ -1,0 +1,370 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { db } from "@/prisma/db";
+import { requireProfileId } from "@/lib/profile";
+import { getOwnedItem } from "@/lib/access";
+import { renderContentField } from "@/lib/content/render";
+import { gradeAnswer, normalizeSprResponse, type AnswerOption } from "@/lib/grading";
+import { toJsonValue } from "@/lib/json";
+
+export interface RenderedOption {
+  id: string;
+  letter: string;
+  html: string;
+}
+
+export interface RenderedItemResult {
+  set: { id: string; name: string; questionCount: number; currentIndex: number };
+  item: {
+    /** Also the Attempt's id, by convention — a 1:1 relationship, so `Attempt.id === PracticeSetItem.id`. */
+    id: string;
+    questionId: string;
+    position: number;
+    type: string;
+    sectionCode: string;
+    domainCode: string;
+    skillCode: string;
+    difficulty: string;
+    scoreBand: number | null;
+    gradable: boolean;
+  };
+  content: {
+    stimulusHtml: string | null;
+    stemHtml: string;
+    options: RenderedOption[] | null;
+  };
+  attempt: {
+    status: string;
+    selectedOptionId: string | null;
+    selectedLetter: string | null;
+    spResponse: string | null;
+    isCorrect: boolean | null;
+    markedForReview: boolean;
+    eliminatedOptionIds: readonly string[];
+    hintsUsed: number;
+    maxHintLevel: number;
+    notes: string | null;
+    highlights: unknown;
+    calculatorOpened: boolean;
+    referenceOpened: boolean;
+  };
+  feedback: RevealedFeedback | null;
+}
+
+export interface RevealedFeedback {
+  rationaleHtml: string;
+  correctOptionId: string | null;
+  correctLetter: string | null;
+  /** SPR only — every accepted literal form, e.g. ["14.5", "29/2"]. Empty for MCQ. */
+  correctAnswer: readonly string[];
+}
+
+/**
+ * Load (and lazily render) one question. `recordVisit` gates every
+ * side effect that means "the user actually looked at this" — the
+ * background prefetch of `position + 1` (see practice-runner.tsx) calls
+ * this too, purely to warm the render cache, and must pass `false` so it
+ * doesn't advance the resume pointer (`PracticeSet.currentIndex`) past
+ * where the user really is, or mark a never-seen question as viewed
+ * (`Attempt.visitCount`/`firstViewedAt`) — both of which would corrupt
+ * the telemetry this app is built to capture.
+ */
+export async function getRenderedItem(
+  setId: string,
+  position: number,
+  recordVisit = true,
+): Promise<RenderedItemResult> {
+  const { profileId, set, item, question } = await getOwnedItem(setId, position);
+  const now = new Date().toISOString();
+
+  const existing = await db.orm.public.Attempt.first({ id: item.id });
+  const attemptRow = existing
+    ? recordVisit
+      ? await db.orm.public.Attempt.where({ id: item.id }).update({
+          visitCount: existing.visitCount + 1,
+          firstViewedAt: existing.firstViewedAt ?? now,
+        })
+      : existing
+    : await db.orm.public.Attempt.create({
+        id: item.id,
+        itemId: item.id,
+        setId,
+        profileId,
+        questionId: question.id,
+        assessment: item.assessment,
+        sectionCode: item.sectionCode,
+        domainCode: item.domainCode,
+        skillCode: item.skillCode,
+        difficulty: item.difficulty,
+        scoreBand: item.scoreBand,
+        type: item.type,
+        contentSource: question.contentSource,
+        status: "unanswered",
+        gradable: item.gradable,
+        firstViewedAt: recordVisit ? now : null,
+        visitCount: recordVisit ? 1 : 0,
+      });
+  // `.update()` types as possibly-null (a predicate might match zero rows);
+  // it can't here — we just read `existing` inside the same request.
+  const attempt = attemptRow!;
+
+  if (recordVisit && set.currentIndex !== position) {
+    await db.orm.public.PracticeSet.where({ id: setId }).update({ currentIndex: position });
+  }
+
+  const options = (question.answerOptions as AnswerOption[] | null)?.map((o) => ({
+    id: o.id,
+    letter: o.letter,
+    html: renderContentField({ html: o.content, contentHash: question.contentHash, field: `option:${o.id}` }),
+  })) ?? null;
+
+  const answered = attempt.status === "answered";
+  let feedback: RenderedItemResult["feedback"] = null;
+  if (answered) {
+    const correctOption = options?.find((o) => question.correctKeys.includes(o.id)) ?? null;
+    feedback = {
+      rationaleHtml: renderContentField({
+        html: question.rationale,
+        contentHash: question.contentHash,
+        field: "rationale",
+      }),
+      correctOptionId: correctOption?.id ?? null,
+      correctLetter: correctOption?.letter ?? null,
+      correctAnswer: question.correctAnswer,
+    };
+  }
+
+  return {
+    set: { id: set.id, name: set.name, questionCount: set.questionCount, currentIndex: position },
+    item: {
+      id: item.id,
+      questionId: question.id,
+      position: item.position,
+      type: item.type,
+      sectionCode: item.sectionCode,
+      domainCode: item.domainCode,
+      skillCode: item.skillCode,
+      difficulty: item.difficulty,
+      scoreBand: item.scoreBand,
+      gradable: item.gradable,
+    },
+    content: {
+      stimulusHtml: question.stimulus
+        ? renderContentField({ html: question.stimulus, contentHash: question.contentHash, field: "stimulus" })
+        : null,
+      stemHtml: renderContentField({ html: question.stem, contentHash: question.contentHash, field: "stem" }),
+      options,
+    },
+    attempt: {
+      status: attempt.status,
+      selectedOptionId: attempt.selectedOptionId,
+      selectedLetter: attempt.selectedLetter,
+      spResponse: attempt.spResponse,
+      isCorrect: attempt.isCorrect,
+      markedForReview: attempt.markedForReview,
+      eliminatedOptionIds: attempt.eliminatedOptionIds,
+      hintsUsed: attempt.hintsUsed,
+      maxHintLevel: attempt.maxHintLevel,
+      notes: attempt.notes,
+      highlights: attempt.highlights,
+      calculatorOpened: attempt.calculatorOpened,
+      referenceOpened: attempt.referenceOpened,
+    },
+    feedback,
+  };
+}
+
+/**
+ * Records the same "actually viewed this" side effects as
+ * `getRenderedItem(..., true)`, without re-rendering content — for when
+ * the runner is about to display a position it already prefetched (with
+ * `recordVisit: false`) and is reusing that cached render.
+ */
+export async function markVisited(setId: string, position: number): Promise<void> {
+  const { set, item } = await getOwnedItem(setId, position);
+  const now = new Date().toISOString();
+  const existing = await db.orm.public.Attempt.first({ id: item.id });
+  if (existing) {
+    await db.orm.public.Attempt.where({ id: item.id }).update({
+      visitCount: existing.visitCount + 1,
+      firstViewedAt: existing.firstViewedAt ?? now,
+    });
+  }
+  if (set.currentIndex !== position) {
+    await db.orm.public.PracticeSet.where({ id: setId }).update({ currentIndex: position });
+  }
+}
+
+export interface SubmitAnswerInput {
+  selectedOptionId?: string;
+  spResponse?: string;
+  timeToFirstInputMs?: number;
+}
+
+export interface SubmitAnswerResult extends RevealedFeedback {
+  isCorrect: boolean | null;
+  gradable: boolean;
+}
+
+export async function submitAnswer(
+  setId: string,
+  position: number,
+  input: SubmitAnswerInput,
+): Promise<SubmitAnswerResult> {
+  const { set, item, question } = await getOwnedItem(setId, position);
+  const now = new Date().toISOString();
+
+  const attempt = await db.orm.public.Attempt.first({ id: item.id });
+  if (!attempt) throw new Error("View the question before submitting.");
+
+  const options = question.answerOptions as AnswerOption[] | null;
+  const correctOption = options?.find((o) => question.correctKeys.includes(o.id)) ?? null;
+
+  // Idempotent: a question already answered in practice mode stays answered
+  // — re-submitting (e.g. a duplicate client request) just returns the
+  // existing feedback rather than re-grading or double-counting rollups.
+  if (attempt.status !== "answered") {
+    const { isCorrect, gradable } = gradeAnswer({
+      type: item.type as "mcq" | "spr",
+      correctKeys: question.correctKeys,
+      selectedOptionId: input.selectedOptionId ?? null,
+      spResponse: input.spResponse ?? null,
+    });
+    const selectedOption = options?.find((o) => o.id === input.selectedOptionId);
+    // Recomputed from real timestamps rather than accumulated from client
+    // deltas — robust against a tab left open, refreshed, or backgrounded
+    // mid-question. Only meaningful once (first submission); a lingering
+    // firstViewedAt gap after that would double-count on a hypothetical
+    // re-submit, but the idempotency guard above already prevents that.
+    const totalMs = attempt.firstViewedAt
+      ? Math.max(0, new Date(now).getTime() - new Date(attempt.firstViewedAt).getTime())
+      : attempt.totalMs;
+
+    await db.orm.public.Attempt.where({ id: item.id }).update({
+      status: "answered",
+      selectedOptionId: input.selectedOptionId ?? null,
+      selectedLetter: selectedOption?.letter ?? null,
+      spResponse: input.spResponse ?? null,
+      spNormalized: input.spResponse ? normalizeSprResponse(input.spResponse) : null,
+      isCorrect,
+      gradable,
+      submittedAt: now,
+      totalMs,
+      timeToFirstInputMs: input.timeToFirstInputMs ?? attempt.timeToFirstInputMs,
+    });
+
+    await db.orm.public.PracticeSet.where({ id: setId }).update({
+      gradedCount: set.gradedCount + 1,
+      correctCount: isCorrect ? set.correctCount + 1 : set.correctCount,
+    });
+  }
+
+  const finalAttempt = await db.orm.public.Attempt.first({ id: item.id });
+  return {
+    isCorrect: finalAttempt!.isCorrect,
+    gradable: finalAttempt!.gradable,
+    rationaleHtml: renderContentField({ html: question.rationale, contentHash: question.contentHash, field: "rationale" }),
+    correctOptionId: correctOption?.id ?? null,
+    correctLetter: correctOption?.letter ?? null,
+    correctAnswer: question.correctAnswer,
+  };
+}
+
+export async function toggleEliminateOption(setId: string, position: number, optionId: string): Promise<string[]> {
+  const { item } = await getOwnedItem(setId, position);
+  const attempt = await db.orm.public.Attempt.first({ id: item.id });
+  if (!attempt) throw new Error("View the question before eliminating an option.");
+
+  const next = attempt.eliminatedOptionIds.includes(optionId)
+    ? attempt.eliminatedOptionIds.filter((id) => id !== optionId)
+    : [...attempt.eliminatedOptionIds, optionId];
+
+  await db.orm.public.Attempt.where({ id: item.id }).update({
+    eliminatedOptionIds: next,
+    eliminationCount: attempt.eliminationCount + 1,
+  });
+  return next;
+}
+
+export async function toggleMarkForReview(setId: string, position: number): Promise<boolean> {
+  const { item } = await getOwnedItem(setId, position);
+  const attempt = await db.orm.public.Attempt.first({ id: item.id });
+  if (!attempt) throw new Error("View the question before marking it for review.");
+  const next = !attempt.markedForReview;
+  await db.orm.public.Attempt.where({ id: item.id }).update({ markedForReview: next });
+  return next;
+}
+
+export async function saveAnnotations(
+  setId: string,
+  position: number,
+  input: { notes: string | null; highlights: unknown[] },
+): Promise<void> {
+  const { item } = await getOwnedItem(setId, position);
+  await db.orm.public.Attempt.where({ id: item.id }).update({
+    notes: input.notes,
+    highlights: toJsonValue(input.highlights),
+    highlightCount: input.highlights.length,
+  });
+}
+
+/** Both fields are "was this tool ever opened during this attempt" — they only ever go false→true. */
+export async function recordToolUsage(
+  setId: string,
+  position: number,
+  tool: "calculator" | "reference",
+  additionalOpenMs = 0,
+): Promise<void> {
+  const { item } = await getOwnedItem(setId, position);
+  if (tool === "calculator") {
+    const attempt = await db.orm.public.Attempt.first({ id: item.id });
+    await db.orm.public.Attempt.where({ id: item.id }).update({
+      calculatorOpened: true,
+      calculatorOpenMs: (attempt?.calculatorOpenMs ?? 0) + additionalOpenMs,
+    });
+  } else {
+    await db.orm.public.Attempt.where({ id: item.id }).update({ referenceOpened: true });
+  }
+}
+
+/**
+ * Adds to the running timing totals — called periodically (alongside the
+ * event-buffer flush) plus right before navigating away, so a crashed tab
+ * still leaves partial data rather than none. `activeMs` (visible+focused
+ * time) and `afterFeedbackMs` (time spent reading the revealed rationale)
+ * are both inherently client-observed; `totalMs` is instead recomputed
+ * server-side from real timestamps whenever the attempt is answered (see
+ * `submitAnswer`), so it isn't accumulated here.
+ */
+export async function recordTime(
+  setId: string,
+  position: number,
+  delta: { activeMs?: number; afterFeedbackMs?: number },
+): Promise<void> {
+  const { set, item } = await getOwnedItem(setId, position);
+  const attempt = await db.orm.public.Attempt.first({ id: item.id });
+  if (!attempt) return;
+  const activeDelta = Math.max(0, Math.round(delta.activeMs ?? 0));
+  await db.orm.public.Attempt.where({ id: item.id }).update({
+    activeMs: attempt.activeMs + activeDelta,
+    timeAfterFeedbackMs: attempt.timeAfterFeedbackMs + Math.max(0, Math.round(delta.afterFeedbackMs ?? 0)),
+  });
+  if (activeDelta > 0) {
+    await db.orm.public.PracticeSet.where({ id: setId }).update({
+      totalActiveMs: set.totalActiveMs + activeDelta,
+    });
+  }
+}
+
+export async function completeSet(setId: string): Promise<void> {
+  const profileId = await requireProfileId();
+  const now = new Date().toISOString();
+  await db.orm.public.PracticeSet.where({ id: setId, profileId }).update({
+    status: "completed",
+    completedAt: now,
+  });
+  revalidatePath(`/sets/${setId}/results`);
+  redirect(`/sets/${setId}/results`);
+}

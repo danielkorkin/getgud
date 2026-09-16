@@ -32,6 +32,9 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# ...except the template itself — README.md tells a fresh clone to `cp` it,
+# which only works if it's actually tracked.
+!.env.example
 
 # vercel
 .vercel
