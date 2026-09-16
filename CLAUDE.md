@@ -11,20 +11,24 @@ by Postgres via Prisma, an AI SDK integration (OpenRouter, model configurable
 via `OPENROUTER_MODEL`), and a scraper that imports questions from the
 College Board Question Bank (see `ATTRIBUTION.md`).
 
-**Current state: data pipeline and practice-tool UI both done.** The
-`Question` / `QuestionAssessment` contract, the scraper, the math-image →
-LaTeX conversion pipeline, and the loader are implemented and have been run
-end-to-end against a local Postgres — see `scripts/README.md` for the
-pipeline stages and `ATTRIBUTION.md` for what's scraped and how equations are
-converted. On top of that: a practice-set builder (`/new`), a Bluebook-style
-runner (`/sets/[id]`) with answer eliminator, mark-for-review, text
-highlighting + notes, a resizable calculator/reference drawer backed by
+**Current state: data pipeline, practice-tool UI, and premade practice tests
+all done.** The `Question` / `QuestionAssessment` contract, the scraper, the
+math-image → LaTeX conversion pipeline, and the loader are implemented and
+have been run end-to-end against a local Postgres — see `scripts/README.md`
+for the pipeline stages and `ATTRIBUTION.md` for what's scraped and how
+equations are converted. On top of that: a practice-set builder (`/new`), a
+Bluebook-style runner (`/sets/[id]`) with answer eliminator, mark-for-review,
+text highlighting + notes, a resizable calculator/reference drawer backed by
 Desmos, an AI hint panel, and instant per-question feedback rendered from the
 College Board rationale; a set
 library (`/sets`) and results screen (`/sets/[id]/results`); local
-cookie-based profiles (no auth); and two API routes (`/api/hint` streaming,
-`/api/events` telemetry ingest). See "Practice-tool app layer" below for the
-data model and load-bearing gotchas.
+cookie-based profiles (no auth); two API routes (`/api/hint` streaming,
+`/api/events` telemetry ingest); and a second, formal practice mode —
+premade, full-length, timed, adaptive SAT practice tests (`/tests`,
+`/tests/[sessionId]`, `/tests/[sessionId]/results`) that are identical on
+every self-hosted instance. See "Practice-tool app layer" below for the
+data model and load-bearing gotchas, and "Premade exams" for the exam
+system specifically.
 
 ## Commands
 
@@ -42,6 +46,10 @@ pnpm scrape          # network -> data/raw/{list,question,ibn}/ (resumable)
 pnpm convert:math    # data/raw/ibn -> data/raw/vision/latex-cache.json (code only, no network/AI)
 pnpm load            # data/raw/** -> Postgres (no network; safe to re-run any time)
 pnpm db:verify       # sanity-check the loaded database
+
+# Premade exam blueprints — see "Premade exams" below
+pnpm design:exam --exam=<id> --seed=<s>   # deterministic, read-only question selection; prints a paste-ready id list
+pnpm design:exam --verify                  # re-check every committed blueprint's invariants against the live DB
 ```
 
 There is no test runner configured yet.
@@ -166,7 +174,8 @@ grammar accepts.
 ## Practice-tool app layer
 
 Server Actions live in `src/actions/` (`profile.ts`, `sets.ts`,
-`attempts.ts`); the two route handlers are `src/app/api/{hint,events}/route.ts`.
+`attempts.ts`, `exams.ts`); the two route handlers are
+`src/app/api/{hint,events}/route.ts`.
 Rendering (MathML/LaTeX → KaTeX, sanitized) is `src/lib/content/render.ts` —
 see its file comment and `src/lib/content/latex-hygiene.ts` for the small,
 verified fixup pass it applies before handing LaTeX to KaTeX. Question
@@ -234,6 +243,147 @@ the calculator renders permanently blank. `practice-runner.tsx` keeps every
 drawer panel (`calculator`/`reference`/`hint`/`notes`) mounted at all times
 and toggles visibility with `hidden` instead — see its comment above the
 `<aside>`.
+
+## Premade exams
+
+A second, formal practice mode alongside random-sampled practice sets:
+full-length, adaptive, timed SAT practice tests that are byte-identical on
+every self-hosted instance, because a test is a committed list of College
+Board question ids (`src/exams/sat-practice-1.ts`, `src/exams/sat-smoke.ts`
+— a 3-question/1-minute dev-only blueprint for fast end-to-end testing of
+the whole state machine) rather than a random sample. `question.id` is
+itself the College Board natural key, so the same ids resolve to the same
+questions on any instance that scraped the same bank — see the header
+comment in `src/exams/index.ts`.
+
+Linked from `/` (a "Practice tests" header button plus a "Practice tests"
+section next to "Recent sets") and from `/sets` (a matching header button);
+`/tests` links back with "Practice sets" and "Home". **This repo has no
+shared nav component** — every page renders its own inline `<header>` —
+so a new top-level section is invisible until you add these cross-links by
+hand on every page that should surface it. Don't assume a new route is
+reachable just because it renders correctly at its own URL.
+
+**Architecture: an exam session IS a `PracticeSet` with `mode: 'exam'`,
+plus two small new models** — `ExamSession` (id always equals its
+`PracticeSet.id`, mirroring the existing `Attempt.id === PracticeSetItem.id`
+convention) and `ExamModule` (one row per section × module-index, tracking
+`status`/`variant`/`startPosition`/`itemCount`/`deadlineAt`). This reuses
+the entire `PracticeSetItem`/`Attempt`/`AttemptEvent` analytics pipeline
+rather than forking it — see the file comment above `ExamSession` in
+`contract.prisma` for the full rationale and for how `Attempt.status`
+means something different in this mode (a response exists vs. graded and
+revealed).
+
+**`src/lib/access.ts`'s `getOwnedItem` takes an `ItemAccessPolicy`,
+defaulting to `'practice-only'` — this is the single most important
+correctness mechanism in the whole feature.** Every existing practice
+caller (`getRenderedItem`, `submitAnswer`, `completeSet`, `POST
+/api/hint`) keeps calling it with no policy argument, which is what closes
+those routes to exam-mode sets automatically: `getRenderedItem` and
+`submitAnswer` reveal the rationale and correct answer for any answered
+attempt, so leaving this gate un-defaulted would leak exam answers
+mid-test. `toggleEliminateOption`/`toggleMarkForReview`/`saveAnnotations`
+pass `'exam-write'` and `recordTime`/`recordToolUsage` pass
+`'exam-telemetry'` explicitly, so those five shared functions work for both
+modes: the policy is a no-op for `mode: 'practice'` sets and enforces the
+active-module + deadline gate for `mode: 'exam'` sets. Never add a new
+caller of `getOwnedItem` that skips this default without a specific reason.
+
+**No module timer ever starts automatically — only on an explicit
+Continue/Start click**, including the break between Reading & Writing and
+Math. Expiry is derived at read time (`isModuleExpired` in
+`src/lib/exam/state.ts`), never written as a stored phase or triggered from
+inside an RSC render — see `src/lib/exam/phases.ts`'s file comment.
+`submitModule` (`src/actions/exams.ts`) is idempotent via a conditional
+`WHERE status='active'` update inside its transaction, because the
+open-tab countdown reaching zero and a reload landing on the same expired
+module **will** race in normal use, not just in theory — an earlier version
+of `exam-runner.tsx`'s expiry-guard ref was set in two places and defeated
+itself, silently skipping the auto-submit entirely; if you touch that guard,
+re-verify with the `sat-smoke` blueprint that a countdown reaching 0 with
+the tab open actually calls `submitModule`, not just that the ref looks
+correct.
+
+**Exam questions are reserved out of `/new`'s random sampling** — the union
+of every registered blueprint's ids (`RESERVED_QUESTION_IDS` in
+`src/exams/index.ts`) is excluded via `AND NOT (q.id = ANY(...))` in *both*
+`countMatchingQuestions` and `sampleQuestions` (`src/lib/query/generate-set.ts`)
+— excluding it from only one would make the builder's live "N questions
+match" count lie.
+
+**`scripts/design-exam.ts` is read-only and never writes into `src/`** — it
+prints a paste-ready TS id-list literal for a human to review and commit by
+hand into a blueprint file. Its `--verify` mode re-checks a committed
+blueprint's ids against the live DB (gradability, section match, no shared
+`templateClusterId`/`parentTemplateId`, table lengths) and should pass
+before and after any manual edit to a blueprint's id lists. It also
+excludes every id already claimed by an *other* registered blueprint from
+the candidate pool (via `RESERVED_QUESTION_IDS`), but exempts the exam
+named by `--exam` from that exclusion — so redesigning `sat-practice-1`
+with the same `--seed` reproduces the exact committed ids, while designing
+a brand-new exam automatically avoids every id already spoken for.
+
+### How to add a new premade test (e.g. a second SAT test, or a PSAT test)
+
+This is the one workflow in this repo an agent is likely to be asked to
+repeat. Follow it in order — each step depends on the last:
+
+1. **Pick an id and name.** `kebab-case`, e.g. `sat-practice-2`. It becomes
+   the blueprint's `id` field and the filename `src/exams/<id>.ts`.
+2. **Decide the domain/band/SPR targets**, or reuse `sat-practice-1`'s if
+   you're not deliberately varying the difficulty/domain mix. These live as
+   hand-authored constants at the top of `scripts/design-exam.ts`
+   (`RW_MODULE_1`, `MATH_MODULE_2_UPPER`, etc.) — they are *not* a CLI
+   parameter, and the script asserts at load time that each design's
+   `domainBandTargets` sums to its module's `count`. If you're adding a
+   second **SAT** blueprint with the same shape (27/27/22/22, same official
+   percentages), you can run the script as-is — it already excludes
+   `sat-practice-1`'s ids automatically. If you're designing a **PSAT**
+   test or a structurally different SAT test, you'll need to param­eterize
+   these constants by exam id first (they're currently written for one
+   design at a time) — check `program`/`assessment` in `question_assessment`
+   for the PSAT case (`'PSAT/NMSQT & PSAT 10'` / `'P10'`), and re-derive the
+   module/timing numbers from the digital PSAT's own published spec, not
+   the SAT's — do not assume they're identical.
+3. **Run the selection**: `pnpm design:exam --exam=<id> --seed=getgud-<id>`.
+   Use a seed that's unique per exam (e.g. `getgud-<id>` as shown) —
+   reusing a seed across exams doesn't cause a collision (candidates are
+   already excluded), but keeping seeds distinct makes each exam's
+   selection order legible on its own. Read the printed
+   module × domain × skill × difficulty × type summary and any `SHORT`
+   lines by hand — this is the actual design review; the script's defaults
+   are a starting point, not an authority (see the file comment at the top
+   of `design-exam.ts`).
+4. **Author the blueprint file** (`src/exams/<id>.ts`), modeled on
+   `sat-practice-1.ts`: paste the printed id lists into
+   `module1`/`module2Lower`/`module2Upper` per section, fill `spec` from
+   the same domain/band/SPR constants you used in step 2, and derive
+   `scaled.lower`/`scaled.upper` raw→scale tables. Don't hand-wave the
+   scoring tables — `scoring.ts`'s file comment explains the official
+   linear-form table this repo rescales from and how the lower-path cap is
+   anchored; follow the same method (or explicitly document a different
+   one) rather than guessing round numbers.
+5. **Register it** in `src/exams/index.ts`'s `ALL_BLUEPRINTS` array. The
+   module-load-time assertions (`validateBlueprint` + cross-blueprint id
+   uniqueness) will throw immediately if something's wrong — that's
+   intentional, don't work around it by disabling the check.
+6. **Verify**: `pnpm design:exam --verify` must pass for every registered
+   exam, not just the new one. Then `pnpm build` (type-check) and
+   `pnpm lint`.
+7. **End-to-end check**: start the dev server and actually run the new
+   test (or add a matching `devOnly` smoke variant first, the way
+   `sat-smoke.ts` does for `sat-practice-1`, if you want a fast
+   timers/routing/expiry check before sitting through the real thing). The
+   real signal that the selection is *usable*, not just structurally
+   valid, is answering questions and reaching the results page — reading
+   the summary table alone doesn't catch a UI-facing issue.
+8. **Do not skip the reservation check** — after registering, `/new`'s
+   live "N questions match" count should drop by the new blueprint's
+   question count (adjusting for ids it shares with the already-excluded
+   ungradable pool, which should be none). This confirms
+   `RESERVED_QUESTION_IDS` picked up the new exam without you touching
+   `generate-set.ts`.
 
 ## Repo layout notes
 

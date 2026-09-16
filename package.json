@@ -15,7 +15,8 @@
     "convert:math": "tsx scripts/convert-math.ts",
     "load": "tsx scripts/load.ts",
     "load:upsert": "tsx scripts/load.ts --mode=upsert",
-    "db:verify": "tsx scripts/verify.ts"
+    "db:verify": "tsx scripts/verify.ts",
+    "design:exam": "tsx scripts/design-exam.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

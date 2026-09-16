@@ -12,6 +12,7 @@ export default async function RunnerPage({ params }: PageProps<"/sets/[id]">) {
 
   const set = await db.orm.public.PracticeSet.first({ id, profileId: profile.id });
   if (!set) notFound();
+  if (set.mode === "exam") redirect(`/tests/${id}`);
   if (set.status === "completed") redirect(`/sets/${id}/results`);
 
   const items = await db.orm.public.PracticeSetItem

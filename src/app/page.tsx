@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Reveal } from "@/components/reveal";
-import { PlusIcon, BooksIcon } from "@phosphor-icons/react/dist/ssr";
+import { PlusIcon, BooksIcon, ExamIcon } from "@phosphor-icons/react/dist/ssr";
 
 const DIFFICULTY_VARIANT = { E: "tag-green", M: "tag-yellow", H: "tag-red" } as const;
 
@@ -30,16 +30,33 @@ export default async function HomePage() {
   }
 
   const inProgress = await db.orm.public.PracticeSet
-    .where({ profileId: profile.id, status: "in_progress" })
+    .where({ profileId: profile.id, status: "in_progress", mode: "practice" })
     .orderBy((s) => s.createdAt.desc())
     .first();
 
   const recent = await db.orm.public.PracticeSet
-    .where({ profileId: profile.id })
+    .where({ profileId: profile.id, mode: "practice" })
     .where((s) => s.status.eq("completed"))
     .orderBy((s) => s.completedAt.desc())
     .limit(5)
     .all();
+
+  const inProgressExamSet = await db.orm.public.PracticeSet
+    .where({ profileId: profile.id, status: "in_progress", mode: "exam" })
+    .orderBy((s) => s.createdAt.desc())
+    .first();
+
+  const recentExamSets = await db.orm.public.PracticeSet
+    .where({ profileId: profile.id, mode: "exam" })
+    .where((s) => s.status.eq("completed"))
+    .orderBy((s) => s.completedAt.desc())
+    .limit(3)
+    .all();
+  const recentExamSessions =
+    recentExamSets.length > 0
+      ? await db.orm.public.ExamSession.where((s) => s.setId.in(recentExamSets.map((set) => set.id))).all()
+      : [];
+  const examSessionBySetId = new Map(recentExamSessions.map((s) => [s.setId, s]));
 
   return (
     <div className="isolate mx-auto flex w-full max-w-4xl flex-col gap-12 px-6 py-16">
@@ -49,14 +66,36 @@ export default async function HomePage() {
           <span className="text-xs tracking-[0.05em] text-muted-foreground uppercase">Getgud</span>
           <h1 className="font-serif text-4xl tracking-tight">Welcome back, {profile.name}</h1>
         </div>
-        <Button render={<Link href="/new" />} nativeButton={false}>
-          <PlusIcon data-icon="inline-start" />
-          New set
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" render={<Link href="/tests" />} nativeButton={false}>
+            <ExamIcon data-icon="inline-start" />
+            Practice tests
+          </Button>
+          <Button render={<Link href="/new" />} nativeButton={false}>
+            <PlusIcon data-icon="inline-start" />
+            New set
+          </Button>
+        </div>
       </header>
 
-      {inProgress && (
+      {inProgressExamSet && (
         <Reveal index={0}>
+          <Link href={`/tests/${inProgressExamSet.id}`} className="block">
+            <Card interactive>
+              <CardHeader>
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle>Continue: {inProgressExamSet.name}</CardTitle>
+                  <Badge variant="tag-blue">Practice test</Badge>
+                </div>
+                <CardDescription>Pick up where you left off — modules are timed and locked once submitted.</CardDescription>
+              </CardHeader>
+            </Card>
+          </Link>
+        </Reveal>
+      )}
+
+      {inProgress && (
+        <Reveal index={inProgressExamSet ? 1 : 0}>
           <Link href={`/sets/${inProgress.id}`} className="block">
             <Card interactive>
               <CardHeader>
@@ -73,7 +112,42 @@ export default async function HomePage() {
         </Reveal>
       )}
 
-      <Reveal index={1}>
+      <Reveal index={2}>
+        <section className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-serif text-xl tracking-tight">Practice tests</h2>
+            <Button variant="ghost" size="sm" render={<Link href="/tests" />} nativeButton={false}>
+              <ExamIcon data-icon="inline-start" />
+              View all
+            </Button>
+          </div>
+          {recentExamSets.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No completed practice tests yet — full-length, timed, and adaptive, just like the real SAT.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {recentExamSets.map((set) => {
+                const session = examSessionBySetId.get(set.id);
+                return (
+                  <Link key={set.id} href={`/tests/${set.id}/results`} className="block">
+                    <Card interactive>
+                      <CardHeader>
+                        <CardTitle className="text-base">{set.name}</CardTitle>
+                        <CardDescription>
+                          {session?.totalScaled != null ? `${session.totalScaled} / 1600` : "Score unavailable"}
+                        </CardDescription>
+                      </CardHeader>
+                    </Card>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </Reveal>
+
+      <Reveal index={3}>
         <section className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <h2 className="font-serif text-xl tracking-tight">Recent sets</h2>

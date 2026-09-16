@@ -2,6 +2,7 @@ import "server-only";
 
 import { param } from "@prisma/orm-postgres/relational-core";
 import { db } from "@/prisma/db";
+import { RESERVED_QUESTION_IDS } from "@/exams";
 import {
   DIFFICULTIES,
   QUESTION_TYPES,
@@ -147,6 +148,11 @@ function buildWhereFragment(filters: SetFilters, profileId: string | null) {
     types: param(filters.types, { codecId: "pg/text@1" }),
     excludeAttempted,
     profileId: profileId ?? "",
+    // Questions used by a premade exam (src/exams/*) are reserved out of
+    // random practice-set sampling entirely, so a first full-length test
+    // isn't spoiled by having drilled its exact questions beforehand.
+    // `= ANY('{}')` is false for every row, so an empty registry is a no-op.
+    reserved: param(RESERVED_QUESTION_IDS as string[], { codecId: "pg/text@1" }),
   };
 }
 
@@ -164,6 +170,7 @@ export async function countMatchingQuestions(filters: SetFilters, profileId: str
       AND (qa."scoreBand" IS NULL OR qa."scoreBand" = ANY(${w.scoreBands}))
       AND q.type = ANY(${w.types})
       AND cardinality(q."correctAnswer") > 0
+      AND NOT (q.id = ANY(${w.reserved}))
       AND (
         NOT ${w.excludeAttempted}
         OR NOT EXISTS (SELECT 1 FROM attempt a WHERE a."profileId" = ${w.profileId} AND a."questionId" = q.id)
@@ -200,6 +207,7 @@ export async function sampleQuestions(
       AND (qa."scoreBand" IS NULL OR qa."scoreBand" = ANY(${w.scoreBands}))
       AND q.type = ANY(${w.types})
       AND cardinality(q."correctAnswer") > 0
+      AND NOT (q.id = ANY(${w.reserved}))
       AND (
         NOT ${w.excludeAttempted}
         OR NOT EXISTS (SELECT 1 FROM attempt a WHERE a."profileId" = ${w.profileId} AND a."questionId" = q.id)

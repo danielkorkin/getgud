@@ -5,7 +5,7 @@ import { getCurrentProfile } from "@/lib/profile";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { PlusIcon } from "@phosphor-icons/react/dist/ssr";
+import { PlusIcon, ExamIcon } from "@phosphor-icons/react/dist/ssr";
 
 const STATUS_LABEL: Record<string, string> = {
   in_progress: "In progress",
@@ -23,7 +23,7 @@ export default async function SetsLibraryPage() {
   if (!profile) redirect("/");
 
   const sets = await db.orm.public.PracticeSet
-    .where({ profileId: profile.id })
+    .where({ profileId: profile.id, mode: "practice" })
     .orderBy((s) => s.createdAt.desc())
     .limit(100)
     .all();
@@ -35,10 +35,16 @@ export default async function SetsLibraryPage() {
           <span className="text-xs tracking-[0.05em] text-muted-foreground uppercase">Library</span>
           <h1 className="font-serif text-4xl tracking-tight">Your practice sets</h1>
         </div>
-        <Button render={<Link href="/new" />} nativeButton={false}>
-          <PlusIcon data-icon="inline-start" />
-          New set
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" render={<Link href="/tests" />} nativeButton={false}>
+            <ExamIcon data-icon="inline-start" />
+            Practice tests
+          </Button>
+          <Button render={<Link href="/new" />} nativeButton={false}>
+            <PlusIcon data-icon="inline-start" />
+            New set
+          </Button>
+        </div>
       </header>
 
       {sets.length === 0 ? (

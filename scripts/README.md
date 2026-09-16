@@ -24,3 +24,8 @@ only re-run `pnpm convert:math` after editing
 `scripts/lib/spoken-math.ts`.
 
 See `ATTRIBUTION.md` for what each stage does and why.
+
+`scripts/design-exam.ts` is a separate, downstream tool — it reads the
+already-loaded question bank to select ids for a premade exam blueprint
+(`src/exams/*.ts`); it isn't part of this four-stage pipeline and never
+touches `data/`. See CLAUDE.md's "Premade exams" section.

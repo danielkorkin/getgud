@@ -272,8 +272,16 @@ export async function submitAnswer(
   };
 }
 
+// The five functions below (toggleEliminateOption .. recordTime) are shared
+// verbatim between practice and exam mode — they pass an explicit
+// 'exam-write'/'exam-telemetry' policy so exam sets get the deadline/
+// active-module gate instead of getOwnedItem's practice-only default,
+// while a practice-mode call is a no-op through that same gate (its
+// `set.mode !== 'exam'` check short-circuits). See src/lib/access.ts's
+// ItemAccessPolicy doc comment.
+
 export async function toggleEliminateOption(setId: string, position: number, optionId: string): Promise<string[]> {
-  const { item } = await getOwnedItem(setId, position);
+  const { item } = await getOwnedItem(setId, position, "exam-write");
   const attempt = await db.orm.public.Attempt.first({ id: item.id });
   if (!attempt) throw new Error("View the question before eliminating an option.");
 
@@ -289,7 +297,7 @@ export async function toggleEliminateOption(setId: string, position: number, opt
 }
 
 export async function toggleMarkForReview(setId: string, position: number): Promise<boolean> {
-  const { item } = await getOwnedItem(setId, position);
+  const { item } = await getOwnedItem(setId, position, "exam-write");
   const attempt = await db.orm.public.Attempt.first({ id: item.id });
   if (!attempt) throw new Error("View the question before marking it for review.");
   const next = !attempt.markedForReview;
@@ -302,7 +310,7 @@ export async function saveAnnotations(
   position: number,
   input: { notes: string | null; highlights: unknown[] },
 ): Promise<void> {
-  const { item } = await getOwnedItem(setId, position);
+  const { item } = await getOwnedItem(setId, position, "exam-write");
   await db.orm.public.Attempt.where({ id: item.id }).update({
     notes: input.notes,
     highlights: toJsonValue(input.highlights),
@@ -317,7 +325,7 @@ export async function recordToolUsage(
   tool: "calculator" | "reference",
   additionalOpenMs = 0,
 ): Promise<void> {
-  const { item } = await getOwnedItem(setId, position);
+  const { item } = await getOwnedItem(setId, position, "exam-telemetry");
   if (tool === "calculator") {
     const attempt = await db.orm.public.Attempt.first({ id: item.id });
     await db.orm.public.Attempt.where({ id: item.id }).update({
@@ -343,7 +351,7 @@ export async function recordTime(
   position: number,
   delta: { activeMs?: number; afterFeedbackMs?: number },
 ): Promise<void> {
-  const { set, item } = await getOwnedItem(setId, position);
+  const { set, item } = await getOwnedItem(setId, position, "exam-telemetry");
   const attempt = await db.orm.public.Attempt.first({ id: item.id });
   if (!attempt) return;
   const activeDelta = Math.max(0, Math.round(delta.activeMs ?? 0));
@@ -360,6 +368,9 @@ export async function recordTime(
 
 export async function completeSet(setId: string): Promise<void> {
   const profileId = await requireProfileId();
+  const set = await db.orm.public.PracticeSet.first({ id: setId, profileId });
+  if (!set) throw new Error("Set not found.");
+  if (set.mode !== "practice") throw new Error("This action is not available for exam sets.");
   const now = new Date().toISOString();
   await db.orm.public.PracticeSet.where({ id: setId, profileId }).update({
     status: "completed",

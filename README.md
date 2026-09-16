@@ -5,17 +5,22 @@ from the College Board Question Bank — see [ATTRIBUTION.md](./ATTRIBUTION.md).
 
 ## Status
 
-Both the data pipeline and the practice-tool app are built. A full SAT and
-PSAT/NMSQT & PSAT 10 scrape, a code-only equation-image-to-LaTeX conversion
-pass, and a Postgres loader (see [scripts/README.md](./scripts/README.md))
-feed a practice-set builder (`/new`), a Bluebook-style question runner
-(`/sets/[id]`) with an answer eliminator, mark-for-review, text highlighting +
-notes, a resizable calculator/reference drawer backed by Desmos, an AI hint
-panel, and instant per-question feedback rendered from the official
-rationale — plus a set library (`/sets`), a results screen, local
-cookie-based profiles (no password), and telemetry capture for a future
-stats screen. See [CLAUDE.md](./CLAUDE.md) for the full architecture and
-load-bearing implementation notes.
+The data pipeline, the practice-tool app, and premade practice tests are all
+built. A full SAT and PSAT/NMSQT & PSAT 10 scrape, a code-only
+equation-image-to-LaTeX conversion pass, and a Postgres loader (see
+[scripts/README.md](./scripts/README.md)) feed a practice-set builder
+(`/new`), a Bluebook-style question runner (`/sets/[id]`) with an answer
+eliminator, mark-for-review, text highlighting + notes, a resizable
+calculator/reference drawer backed by Desmos, an AI hint panel, and instant
+per-question feedback rendered from the official rationale — plus a set
+library (`/sets`), a results screen, local cookie-based profiles (no
+password), and telemetry capture for a future stats screen. Alongside that,
+`/tests` offers full-length, timed, adaptive SAT practice tests — the same
+committed set of questions on every self-hosted copy of Getgud, with
+module-scoped timers, routing into an easier or harder second module based
+on first-module performance, and a scaled score out of 1600 at the end. See
+[CLAUDE.md](./CLAUDE.md) for the full architecture and load-bearing
+implementation notes.
 
 ## From-scratch setup
 

@@ -24,6 +24,7 @@ export default async function ResultsPage({ params }: PageProps<"/sets/[id]/resu
 
   const set = await db.orm.public.PracticeSet.first({ id, profileId: profile.id });
   if (!set) notFound();
+  if (set.mode === "exam") redirect(`/tests/${id}/results`);
 
   const items = await db.orm.public.PracticeSetItem
     .where({ setId: id })

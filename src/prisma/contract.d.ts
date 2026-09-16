@@ -34,7 +34,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'b6ab140b799d9efceaec29985df184aed44b3298691e98f51ee823202fed40d2'>;
+  StorageHashBase<'ad3c29fa32f5b040eeea2ed3e0eee1850837655655e5f97a39638faed5ddb8e2'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
@@ -302,6 +302,43 @@ export type FieldOutputTypes = {
       readonly level: CodecTypes['pg/int4@1']['output'];
       readonly requestedAt: CodecTypes['pg/timestamptz-string@1']['output'];
     };
+    readonly ExamModule: {
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly sessionId: CodecTypes['pg/text@1']['output'];
+      readonly sectionCode: CodecTypes['pg/text@1']['output'];
+      readonly moduleIndex: CodecTypes['pg/int4@1']['output'];
+      readonly variant: CodecTypes['pg/text@1']['output'] | null;
+      readonly status: CodecTypes['pg/text@1']['output'];
+      readonly startPosition: CodecTypes['pg/int4@1']['output'];
+      readonly itemCount: CodecTypes['pg/int4@1']['output'];
+      readonly minutes: CodecTypes['pg/int4@1']['output'];
+      readonly startedAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
+      readonly deadlineAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
+      readonly submittedAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
+      readonly rawCorrect: CodecTypes['pg/int4@1']['output'] | null;
+      readonly answeredCount: CodecTypes['pg/int4@1']['output'] | null;
+      readonly autoSubmitted: CodecTypes['pg/bool@1']['output'];
+    };
+    readonly ExamSession: {
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly setId: CodecTypes['pg/text@1']['output'];
+      readonly profileId: CodecTypes['pg/text@1']['output'];
+      readonly examId: CodecTypes['pg/text@1']['output'];
+      readonly assessment: CodecTypes['pg/text@1']['output'];
+      readonly phase: CodecTypes['pg/text@1']['output'];
+      readonly rwVariant: CodecTypes['pg/text@1']['output'] | null;
+      readonly rwRaw: CodecTypes['pg/int4@1']['output'] | null;
+      readonly rwScaled: CodecTypes['pg/int4@1']['output'] | null;
+      readonly mathVariant: CodecTypes['pg/text@1']['output'] | null;
+      readonly mathRaw: CodecTypes['pg/int4@1']['output'] | null;
+      readonly mathScaled: CodecTypes['pg/int4@1']['output'] | null;
+      readonly totalScaled: CodecTypes['pg/int4@1']['output'] | null;
+      readonly breakStartedAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
+      readonly breakEndsAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
+      readonly createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
+      readonly startedAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
+      readonly completedAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
+    };
     readonly PracticeSet: {
       readonly id: CodecTypes['pg/text@1']['output'];
       readonly profileId: CodecTypes['pg/text@1']['output'];
@@ -457,6 +494,43 @@ export type FieldInputTypes = {
       readonly questionId: CodecTypes['pg/text@1']['input'];
       readonly level: CodecTypes['pg/int4@1']['input'];
       readonly requestedAt: CodecTypes['pg/timestamptz-string@1']['input'];
+    };
+    readonly ExamModule: {
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly sessionId: CodecTypes['pg/text@1']['input'];
+      readonly sectionCode: CodecTypes['pg/text@1']['input'];
+      readonly moduleIndex: CodecTypes['pg/int4@1']['input'];
+      readonly variant: CodecTypes['pg/text@1']['input'] | null;
+      readonly status: CodecTypes['pg/text@1']['input'];
+      readonly startPosition: CodecTypes['pg/int4@1']['input'];
+      readonly itemCount: CodecTypes['pg/int4@1']['input'];
+      readonly minutes: CodecTypes['pg/int4@1']['input'];
+      readonly startedAt: CodecTypes['pg/timestamptz-string@1']['input'] | null;
+      readonly deadlineAt: CodecTypes['pg/timestamptz-string@1']['input'] | null;
+      readonly submittedAt: CodecTypes['pg/timestamptz-string@1']['input'] | null;
+      readonly rawCorrect: CodecTypes['pg/int4@1']['input'] | null;
+      readonly answeredCount: CodecTypes['pg/int4@1']['input'] | null;
+      readonly autoSubmitted: CodecTypes['pg/bool@1']['input'];
+    };
+    readonly ExamSession: {
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly setId: CodecTypes['pg/text@1']['input'];
+      readonly profileId: CodecTypes['pg/text@1']['input'];
+      readonly examId: CodecTypes['pg/text@1']['input'];
+      readonly assessment: CodecTypes['pg/text@1']['input'];
+      readonly phase: CodecTypes['pg/text@1']['input'];
+      readonly rwVariant: CodecTypes['pg/text@1']['input'] | null;
+      readonly rwRaw: CodecTypes['pg/int4@1']['input'] | null;
+      readonly rwScaled: CodecTypes['pg/int4@1']['input'] | null;
+      readonly mathVariant: CodecTypes['pg/text@1']['input'] | null;
+      readonly mathRaw: CodecTypes['pg/int4@1']['input'] | null;
+      readonly mathScaled: CodecTypes['pg/int4@1']['input'] | null;
+      readonly totalScaled: CodecTypes['pg/int4@1']['input'] | null;
+      readonly breakStartedAt: CodecTypes['pg/timestamptz-string@1']['input'] | null;
+      readonly breakEndsAt: CodecTypes['pg/timestamptz-string@1']['input'] | null;
+      readonly createdAt: CodecTypes['pg/timestamptz-string@1']['input'];
+      readonly startedAt: CodecTypes['pg/timestamptz-string@1']['input'] | null;
+      readonly completedAt: CodecTypes['pg/timestamptz-string@1']['input'] | null;
     };
     readonly PracticeSet: {
       readonly id: CodecTypes['pg/text@1']['input'];
@@ -614,6 +688,43 @@ export type StorageColumnTypes = {
       readonly questionId: CodecTypes['pg/text@1']['output'];
       readonly requestedAt: CodecTypes['pg/timestamptz-string@1']['output'];
     };
+    readonly exam_module: {
+      readonly answeredCount: CodecTypes['pg/int4@1']['output'] | null;
+      readonly autoSubmitted: CodecTypes['pg/bool@1']['output'];
+      readonly deadlineAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly itemCount: CodecTypes['pg/int4@1']['output'];
+      readonly minutes: CodecTypes['pg/int4@1']['output'];
+      readonly moduleIndex: CodecTypes['pg/int4@1']['output'];
+      readonly rawCorrect: CodecTypes['pg/int4@1']['output'] | null;
+      readonly sectionCode: CodecTypes['pg/text@1']['output'];
+      readonly sessionId: CodecTypes['pg/text@1']['output'];
+      readonly startedAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
+      readonly startPosition: CodecTypes['pg/int4@1']['output'];
+      readonly status: CodecTypes['pg/text@1']['output'];
+      readonly submittedAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
+      readonly variant: CodecTypes['pg/text@1']['output'] | null;
+    };
+    readonly exam_session: {
+      readonly assessment: CodecTypes['pg/text@1']['output'];
+      readonly breakEndsAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
+      readonly breakStartedAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
+      readonly completedAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
+      readonly createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
+      readonly examId: CodecTypes['pg/text@1']['output'];
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly mathRaw: CodecTypes['pg/int4@1']['output'] | null;
+      readonly mathScaled: CodecTypes['pg/int4@1']['output'] | null;
+      readonly mathVariant: CodecTypes['pg/text@1']['output'] | null;
+      readonly phase: CodecTypes['pg/text@1']['output'];
+      readonly profileId: CodecTypes['pg/text@1']['output'];
+      readonly rwRaw: CodecTypes['pg/int4@1']['output'] | null;
+      readonly rwScaled: CodecTypes['pg/int4@1']['output'] | null;
+      readonly rwVariant: CodecTypes['pg/text@1']['output'] | null;
+      readonly setId: CodecTypes['pg/text@1']['output'];
+      readonly startedAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
+      readonly totalScaled: CodecTypes['pg/int4@1']['output'] | null;
+    };
     readonly practice_set: {
       readonly assessment: CodecTypes['pg/text@1']['output'];
       readonly completedAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
@@ -770,6 +881,43 @@ export type StorageColumnInputTypes = {
       readonly questionId: CodecTypes['pg/text@1']['input'];
       readonly requestedAt: CodecTypes['pg/timestamptz-string@1']['input'];
     };
+    readonly exam_module: {
+      readonly answeredCount: CodecTypes['pg/int4@1']['input'] | null;
+      readonly autoSubmitted: CodecTypes['pg/bool@1']['input'];
+      readonly deadlineAt: CodecTypes['pg/timestamptz-string@1']['input'] | null;
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly itemCount: CodecTypes['pg/int4@1']['input'];
+      readonly minutes: CodecTypes['pg/int4@1']['input'];
+      readonly moduleIndex: CodecTypes['pg/int4@1']['input'];
+      readonly rawCorrect: CodecTypes['pg/int4@1']['input'] | null;
+      readonly sectionCode: CodecTypes['pg/text@1']['input'];
+      readonly sessionId: CodecTypes['pg/text@1']['input'];
+      readonly startedAt: CodecTypes['pg/timestamptz-string@1']['input'] | null;
+      readonly startPosition: CodecTypes['pg/int4@1']['input'];
+      readonly status: CodecTypes['pg/text@1']['input'];
+      readonly submittedAt: CodecTypes['pg/timestamptz-string@1']['input'] | null;
+      readonly variant: CodecTypes['pg/text@1']['input'] | null;
+    };
+    readonly exam_session: {
+      readonly assessment: CodecTypes['pg/text@1']['input'];
+      readonly breakEndsAt: CodecTypes['pg/timestamptz-string@1']['input'] | null;
+      readonly breakStartedAt: CodecTypes['pg/timestamptz-string@1']['input'] | null;
+      readonly completedAt: CodecTypes['pg/timestamptz-string@1']['input'] | null;
+      readonly createdAt: CodecTypes['pg/timestamptz-string@1']['input'];
+      readonly examId: CodecTypes['pg/text@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly mathRaw: CodecTypes['pg/int4@1']['input'] | null;
+      readonly mathScaled: CodecTypes['pg/int4@1']['input'] | null;
+      readonly mathVariant: CodecTypes['pg/text@1']['input'] | null;
+      readonly phase: CodecTypes['pg/text@1']['input'];
+      readonly profileId: CodecTypes['pg/text@1']['input'];
+      readonly rwRaw: CodecTypes['pg/int4@1']['input'] | null;
+      readonly rwScaled: CodecTypes['pg/int4@1']['input'] | null;
+      readonly rwVariant: CodecTypes['pg/text@1']['input'] | null;
+      readonly setId: CodecTypes['pg/text@1']['input'];
+      readonly startedAt: CodecTypes['pg/timestamptz-string@1']['input'] | null;
+      readonly totalScaled: CodecTypes['pg/int4@1']['input'] | null;
+    };
     readonly practice_set: {
       readonly assessment: CodecTypes['pg/text@1']['input'];
       readonly completedAt: CodecTypes['pg/timestamptz-string@1']['input'] | null;
@@ -923,8 +1071,9 @@ export namespace Models {
     createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
     lastSeenAt: CodecTypes['pg/timestamptz-string@1']['output'];
     attempts: public_Attempt[];
+    examSessions: public_ExamSession[];
     practiceSets: public_PracticeSet[];
-    readonly [RelationKeys]?: 'attempts' | 'practiceSets';
+    readonly [RelationKeys]?: 'attempts' | 'examSessions' | 'practiceSets';
   };
   export type public_PracticeSet = {
     id: CodecTypes['pg/text@1']['output'];
@@ -945,9 +1094,10 @@ export namespace Models {
     startedAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
     completedAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
     attempts: public_Attempt[];
+    examSession: public_ExamSession | null;
     items: public_PracticeSetItem[];
     profile: public_Profile;
-    readonly [RelationKeys]?: 'attempts' | 'items' | 'profile';
+    readonly [RelationKeys]?: 'attempts' | 'examSession' | 'items' | 'profile';
   };
   export type public_PracticeSetItem = {
     id: CodecTypes['pg/text@1']['output'];
@@ -1050,6 +1200,49 @@ export namespace Models {
     hint: public_QuestionHint;
     readonly [RelationKeys]?: 'attempt' | 'hint';
   };
+  export type public_ExamSession = {
+    id: CodecTypes['pg/text@1']['output'];
+    setId: CodecTypes['pg/text@1']['output'];
+    profileId: CodecTypes['pg/text@1']['output'];
+    examId: CodecTypes['pg/text@1']['output'];
+    assessment: CodecTypes['pg/text@1']['output'];
+    phase: CodecTypes['pg/text@1']['output'];
+    rwVariant: CodecTypes['pg/text@1']['output'] | null;
+    rwRaw: CodecTypes['pg/int4@1']['output'] | null;
+    rwScaled: CodecTypes['pg/int4@1']['output'] | null;
+    mathVariant: CodecTypes['pg/text@1']['output'] | null;
+    mathRaw: CodecTypes['pg/int4@1']['output'] | null;
+    mathScaled: CodecTypes['pg/int4@1']['output'] | null;
+    totalScaled: CodecTypes['pg/int4@1']['output'] | null;
+    breakStartedAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
+    breakEndsAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
+    createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
+    startedAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
+    completedAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
+    modules: public_ExamModule[];
+    profile: public_Profile;
+    set: public_PracticeSet;
+    readonly [RelationKeys]?: 'modules' | 'profile' | 'set';
+  };
+  export type public_ExamModule = {
+    id: CodecTypes['pg/text@1']['output'];
+    sessionId: CodecTypes['pg/text@1']['output'];
+    sectionCode: CodecTypes['pg/text@1']['output'];
+    moduleIndex: CodecTypes['pg/int4@1']['output'];
+    variant: CodecTypes['pg/text@1']['output'] | null;
+    status: CodecTypes['pg/text@1']['output'];
+    startPosition: CodecTypes['pg/int4@1']['output'];
+    itemCount: CodecTypes['pg/int4@1']['output'];
+    minutes: CodecTypes['pg/int4@1']['output'];
+    startedAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
+    deadlineAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
+    submittedAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
+    rawCorrect: CodecTypes['pg/int4@1']['output'] | null;
+    answeredCount: CodecTypes['pg/int4@1']['output'] | null;
+    autoSubmitted: CodecTypes['pg/bool@1']['output'];
+    session: public_ExamSession;
+    readonly [RelationKeys]?: 'session';
+  };
 }
 
 export declare const models: {
@@ -1063,6 +1256,8 @@ export declare const models: {
     AttemptEvent: Models.public_AttemptEvent;
     QuestionHint: Models.public_QuestionHint;
     AttemptHint: Models.public_AttemptHint;
+    ExamSession: Models.public_ExamSession;
+    ExamModule: Models.public_ExamModule;
   };
 };
 
@@ -1582,6 +1777,258 @@ type ContractBase = Omit<
                     readonly namespaceId: 'public' & NamespaceId;
                     readonly tableName: 'question_hint';
                     readonly columns: readonly ['questionId', 'level'];
+                  };
+                },
+              ];
+            };
+            readonly exam_module: {
+              columns: {
+                readonly id: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly sessionId: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly sectionCode: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly moduleIndex: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                };
+                readonly variant: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
+                readonly status: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly startPosition: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                };
+                readonly itemCount: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                };
+                readonly minutes: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                };
+                readonly startedAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-string@1';
+                  readonly nullable: true;
+                };
+                readonly deadlineAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-string@1';
+                  readonly nullable: true;
+                };
+                readonly submittedAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-string@1';
+                  readonly nullable: true;
+                };
+                readonly rawCorrect: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: true;
+                };
+                readonly answeredCount: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: true;
+                };
+                readonly autoSubmitted: {
+                  readonly nativeType: 'bool';
+                  readonly codecId: 'pg/bool@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/bool@1', false>;
+                  };
+                };
+              };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [
+                { readonly columns: readonly ['sessionId', 'sectionCode', 'moduleIndex'] },
+              ];
+              indexes: readonly [
+                {
+                  readonly name: 'exam_module_sessionId_status_idx_ec4417ba';
+                  readonly prefix: 'exam_module_sessionId_status_idx';
+                  readonly columns: readonly ['sessionId', 'status'];
+                  readonly unique: false;
+                },
+                {
+                  readonly name: 'exam_module_sessionId_idx_29f415d4';
+                  readonly prefix: 'exam_module_sessionId_idx';
+                  readonly columns: readonly ['sessionId'];
+                  readonly unique: false;
+                },
+              ];
+              foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'exam_module';
+                    readonly columns: readonly ['sessionId'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'exam_session';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+              ];
+            };
+            readonly exam_session: {
+              columns: {
+                readonly id: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly setId: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly profileId: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly examId: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly assessment: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly phase: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly rwVariant: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
+                readonly rwRaw: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: true;
+                };
+                readonly rwScaled: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: true;
+                };
+                readonly mathVariant: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
+                readonly mathRaw: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: true;
+                };
+                readonly mathScaled: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: true;
+                };
+                readonly totalScaled: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: true;
+                };
+                readonly breakStartedAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-string@1';
+                  readonly nullable: true;
+                };
+                readonly breakEndsAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-string@1';
+                  readonly nullable: true;
+                };
+                readonly createdAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-string@1';
+                  readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                };
+                readonly startedAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-string@1';
+                  readonly nullable: true;
+                };
+                readonly completedAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-string@1';
+                  readonly nullable: true;
+                };
+              };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [{ readonly columns: readonly ['setId'] }];
+              indexes: readonly [
+                {
+                  readonly name: 'exam_session_profileId_examId_idx_883909df';
+                  readonly prefix: 'exam_session_profileId_examId_idx';
+                  readonly columns: readonly ['profileId', 'examId'];
+                  readonly unique: false;
+                },
+                {
+                  readonly name: 'exam_session_profileId_idx_d9cdfcaf';
+                  readonly prefix: 'exam_session_profileId_idx';
+                  readonly columns: readonly ['profileId'];
+                  readonly unique: false;
+                },
+              ];
+              foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'exam_session';
+                    readonly columns: readonly ['setId'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'practice_set';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'exam_session';
+                    readonly columns: readonly ['profileId'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'profile';
+                    readonly columns: readonly ['id'];
                   };
                 },
               ];
@@ -2230,6 +2677,14 @@ type ContractBase = Omit<
       readonly namespace: 'public' & NamespaceId;
       readonly model: 'AttemptHint';
     };
+    readonly exam_session: {
+      readonly namespace: 'public' & NamespaceId;
+      readonly model: 'ExamSession';
+    };
+    readonly exam_module: {
+      readonly namespace: 'public' & NamespaceId;
+      readonly model: 'ExamModule';
+    };
   };
   readonly domain: {
     readonly namespaces: {
@@ -2668,6 +3123,266 @@ type ContractBase = Omit<
               };
             };
           };
+          readonly ExamModule: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly sessionId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly sectionCode: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly moduleIndex: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly variant: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly status: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly startPosition: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly itemCount: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly minutes: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly startedAt: {
+                readonly nullable: true;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-string@1';
+                };
+              };
+              readonly deadlineAt: {
+                readonly nullable: true;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-string@1';
+                };
+              };
+              readonly submittedAt: {
+                readonly nullable: true;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-string@1';
+                };
+              };
+              readonly rawCorrect: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly answeredCount: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly autoSubmitted: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/bool@1' };
+              };
+            };
+            readonly relations: {
+              readonly session: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'ExamSession';
+                };
+                readonly cardinality: 'N:1';
+                readonly nullable: false;
+                readonly on: {
+                  readonly localFields: readonly ['sessionId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'exam_module';
+              readonly namespaceId: 'public';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly sessionId: { readonly column: 'sessionId' };
+                readonly sectionCode: { readonly column: 'sectionCode' };
+                readonly moduleIndex: { readonly column: 'moduleIndex' };
+                readonly variant: { readonly column: 'variant' };
+                readonly status: { readonly column: 'status' };
+                readonly startPosition: { readonly column: 'startPosition' };
+                readonly itemCount: { readonly column: 'itemCount' };
+                readonly minutes: { readonly column: 'minutes' };
+                readonly startedAt: { readonly column: 'startedAt' };
+                readonly deadlineAt: { readonly column: 'deadlineAt' };
+                readonly submittedAt: { readonly column: 'submittedAt' };
+                readonly rawCorrect: { readonly column: 'rawCorrect' };
+                readonly answeredCount: { readonly column: 'answeredCount' };
+                readonly autoSubmitted: { readonly column: 'autoSubmitted' };
+              };
+            };
+          };
+          readonly ExamSession: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly setId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly profileId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly examId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly assessment: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly phase: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly rwVariant: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly rwRaw: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly rwScaled: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly mathVariant: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly mathRaw: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly mathScaled: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly totalScaled: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly breakStartedAt: {
+                readonly nullable: true;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-string@1';
+                };
+              };
+              readonly breakEndsAt: {
+                readonly nullable: true;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-string@1';
+                };
+              };
+              readonly createdAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-string@1';
+                };
+              };
+              readonly startedAt: {
+                readonly nullable: true;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-string@1';
+                };
+              };
+              readonly completedAt: {
+                readonly nullable: true;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-string@1';
+                };
+              };
+            };
+            readonly relations: {
+              readonly modules: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'ExamModule';
+                };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['sessionId'];
+                };
+              };
+              readonly profile: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'Profile';
+                };
+                readonly cardinality: 'N:1';
+                readonly nullable: false;
+                readonly on: {
+                  readonly localFields: readonly ['profileId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+              readonly set: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'PracticeSet';
+                };
+                readonly cardinality: 'N:1';
+                readonly nullable: false;
+                readonly on: {
+                  readonly localFields: readonly ['setId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'exam_session';
+              readonly namespaceId: 'public';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly setId: { readonly column: 'setId' };
+                readonly profileId: { readonly column: 'profileId' };
+                readonly examId: { readonly column: 'examId' };
+                readonly assessment: { readonly column: 'assessment' };
+                readonly phase: { readonly column: 'phase' };
+                readonly rwVariant: { readonly column: 'rwVariant' };
+                readonly rwRaw: { readonly column: 'rwRaw' };
+                readonly rwScaled: { readonly column: 'rwScaled' };
+                readonly mathVariant: { readonly column: 'mathVariant' };
+                readonly mathRaw: { readonly column: 'mathRaw' };
+                readonly mathScaled: { readonly column: 'mathScaled' };
+                readonly totalScaled: { readonly column: 'totalScaled' };
+                readonly breakStartedAt: { readonly column: 'breakStartedAt' };
+                readonly breakEndsAt: { readonly column: 'breakEndsAt' };
+                readonly createdAt: { readonly column: 'createdAt' };
+                readonly startedAt: { readonly column: 'startedAt' };
+                readonly completedAt: { readonly column: 'completedAt' };
+              };
+            };
+          };
           readonly PracticeSet: {
             readonly fields: {
               readonly id: {
@@ -2757,6 +3472,18 @@ type ContractBase = Omit<
                   readonly model: 'Attempt';
                 };
                 readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['setId'];
+                };
+              };
+              readonly examSession: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'ExamSession';
+                };
+                readonly cardinality: '1:1';
+                readonly nullable: true;
                 readonly on: {
                   readonly localFields: readonly ['id'];
                   readonly targetFields: readonly ['setId'];
@@ -2952,6 +3679,17 @@ type ContractBase = Omit<
                 readonly to: {
                   readonly namespace: 'public' & NamespaceId;
                   readonly model: 'Attempt';
+                };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['profileId'];
+                };
+              };
+              readonly examSessions: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'ExamSession';
                 };
                 readonly cardinality: '1:N';
                 readonly on: {

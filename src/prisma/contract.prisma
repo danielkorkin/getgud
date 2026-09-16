@@ -133,6 +133,7 @@ model Profile {
 
   practiceSets PracticeSet[]
   attempts     Attempt[]
+  examSessions ExamSession[]
 
   @@map("profile")
 }
@@ -144,7 +145,7 @@ model PracticeSet {
 
   name   String
   status String // 'in_progress' | 'completed' | 'abandoned'
-  mode   String // 'practice' — the only mode implemented today; reserved for a future 'timed'
+  mode   String // 'practice' (random-sampled drilling) | 'exam' (premade, full-length — see ExamSession)
 
   // Full generator spec (assessment, sections, difficulties, domains/skills,
   // scoreBands, types, excludeAttempted, length) — replaying/regenerating a
@@ -169,6 +170,8 @@ model PracticeSet {
 
   items    PracticeSetItem[]
   attempts Attempt[]
+
+  examSession ExamSession?
 
   @@map("practice_set")
   @@index([profileId, status])
@@ -327,4 +330,103 @@ model AttemptHint {
   @@unique([attemptId, questionId, level])
   @@map("attempt_hint")
   @@index([attemptId])
+}
+
+// ─── Premade full-length adaptive exams ─────────────────────────────────────
+// An exam session IS a PracticeSet with mode='exam'. These two models add
+// only what a practice set has no concept of: the module split, the routing
+// decision, and the server-authoritative per-module deadline. Every item and
+// response still lives in PracticeSetItem/Attempt, so exams inherit the
+// whole timing/tool/annotation column set and the AttemptEvent pipeline
+// unchanged — see src/exams/ (blueprints), src/lib/exam/ (state helpers),
+// and src/actions/exams.ts (the action surface).
+//
+// ExamSession.id always equals its PracticeSet.id, by convention, not a
+// schema constraint — same convention, same reason, as
+// Attempt.id === PracticeSetItem.id: this ORM's .upsert() conflict-targets
+// the primary key, and it lets /tests/[sessionId] and the existing
+// EventBuffer / POST /api/events address one identity with zero changes.
+//
+// Attempt.status means something different in this mode, deliberately:
+//   practice  'answered' means graded AND revealed (isCorrect is set).
+//   exam      'answered' means a response exists; isCorrect/submittedAt
+//             stay NULL until the module is submitted and graded in bulk.
+//   `isCorrect IS NULL AND submittedAt IS NULL` uniquely identifies an
+//   in-flight, ungraded exam response.
+
+model ExamSession {
+  id String @id
+
+  setId String      @unique
+  set   PracticeSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  examId     String // registry key from src/exams/index.ts — NOT a FK; blueprints are committed code, not rows
+  assessment String
+
+  phase String // one of EXAM_PHASES (src/lib/exam/phases.ts) — rw_1_directions .. completed
+
+  // Score snapshot, written once at completion (src/exams/scoring.ts) rather
+  // than recomputed on the results page — so re-tuning a blueprint's scaled
+  // table later can never rewrite a completed test's history.
+  rwVariant   String? // 'lower' | 'upper'
+  rwRaw       Int?
+  rwScaled    Int?
+  mathVariant String? // 'lower' | 'upper'
+  mathRaw     Int?
+  mathScaled  Int?
+  totalScaled Int?
+
+  breakStartedAt TimestamptzString?
+  breakEndsAt    TimestamptzString?
+
+  createdAt   TimestamptzString  @default(now())
+  startedAt   TimestamptzString?
+  completedAt TimestamptzString?
+
+  modules ExamModule[]
+
+  @@map("exam_session")
+  @@index([profileId, examId])
+}
+
+model ExamModule {
+  id        String      @id
+  sessionId String
+  session   ExamSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  sectionCode String // 'RW' | 'MATH'
+  moduleIndex Int // 1 | 2
+  variant     String? // NULL for module 1; 'lower' | 'upper' once module 1 is graded and this module is routed
+
+  status String // 'pending' | 'active' | 'submitted'
+
+  // Half-open range [startPosition, startPosition + itemCount) into
+  // PracticeSetItem.position. Fixed for ALL FOUR modules at session
+  // creation time — this requires the blueprint's module2Lower and
+  // module2Upper id lists to be the same length (see validateBlueprint in
+  // src/exams/spec.ts) — which is what lets module-2 PracticeSetItem rows
+  // be inserted later, after routing, without renumbering anything.
+  startPosition Int
+  itemCount     Int
+  minutes       Int
+
+  // Server-authoritative timing. deadlineAt is the ONLY expiry truth — the
+  // client counts down against it using a server-clock offset, never its
+  // own wall clock. Written exactly once, by startModule(), when the
+  // student presses Continue on this module's directions screen (never
+  // automatically).
+  startedAt   TimestamptzString?
+  deadlineAt  TimestamptzString?
+  submittedAt TimestamptzString?
+
+  rawCorrect    Int?
+  answeredCount Int?
+  autoSubmitted Boolean @default(false)
+
+  @@unique([sessionId, sectionCode, moduleIndex])
+  @@map("exam_module")
+  @@index([sessionId, status])
 }
