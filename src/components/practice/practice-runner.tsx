@@ -195,7 +195,11 @@ export function PracticeRunner({
   async function handleToggleEliminate(optionId: string) {
     const next = await toggleEliminateOption(setId, position, optionId);
     setEliminated(next);
-    eventBufferRef.current?.record(next.includes(optionId) ? "eliminate_option" : "restore_option", elapsedSinceStart(), {
+    const justEliminated = next.includes(optionId);
+    if (justEliminated && selectedOptionId === optionId) {
+      setSelectedOptionId(null);
+    }
+    eventBufferRef.current?.record(justEliminated ? "eliminate_option" : "restore_option", elapsedSinceStart(), {
       optionId,
     });
   }
