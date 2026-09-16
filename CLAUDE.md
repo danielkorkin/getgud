@@ -18,8 +18,9 @@ end-to-end against a local Postgres — see `scripts/README.md` for the
 pipeline stages and `ATTRIBUTION.md` for what's scraped and how equations are
 converted. On top of that: a practice-set builder (`/new`), a Bluebook-style
 runner (`/sets/[id]`) with answer eliminator, mark-for-review, text
-highlighting + notes, a Desmos calculator, an AI hint panel, and instant
-per-question feedback rendered from the College Board rationale; a set
+highlighting + notes, a resizable calculator/reference drawer backed by
+Desmos, an AI hint panel, and instant per-question feedback rendered from the
+College Board rationale; a set
 library (`/sets`) and results screen (`/sets/[id]/results`); local
 cookie-based profiles (no auth); and two API routes (`/api/hint` streaming,
 `/api/events` telemetry ingest). See "Practice-tool app layer" below for the
@@ -187,6 +188,17 @@ highlighting in the runner) fails a production build if it's in
 recognize the pseudo-element yet, even though every browser that implements
 the API parses it fine at runtime. The rule lives in
 `highlightable.tsx` as a runtime `<style>` tag instead.
+
+**`DesmosCalculator` (`desmos-calculator.tsx`) must stay mounted for the
+life of the runner, never conditionally rendered per-drawer** — `next/script`'s
+`onLoad` callback only fires on the script's first-ever load. If the
+component unmounts and remounts after the Desmos script is already cached
+(e.g. a naive `{activeDrawer === "calculator" && <DesmosCalculator />}`),
+`onLoad` never fires again, the `ready` state never flips back to true, and
+the calculator renders permanently blank. `practice-runner.tsx` keeps every
+drawer panel (`calculator`/`reference`/`hint`/`notes`) mounted at all times
+and toggles visibility with `hidden` instead — see its comment above the
+`<aside>`.
 
 ## Repo layout notes
 
