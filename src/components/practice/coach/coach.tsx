@@ -14,6 +14,7 @@ import type { EventType } from "@/lib/event-types";
 import { XIcon } from "@phosphor-icons/react";
 
 type AnimationKey = keyof typeof strobiDefinition.animations;
+type ExpressionKey = keyof typeof strobiDefinition.expressions;
 type Feedback = RevealedFeedback & { isCorrect: boolean | null };
 
 const WRONG_MOODS: AnimationKey[] = ["sad", "angry", "confused"];
@@ -24,9 +25,50 @@ const PRAISE = [
   "Correct — keep that up.",
 ];
 const IDLE_RETURN_MS = 4000;
+const AVATAR_SIZE = 84;
 
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
+}
+
+// Idle-time "eyes follow the cursor" — approximated by switching between a
+// handful of the avatar's own existing directional expressions (there is no
+// public API for continuous custom eye positions; every render frame is
+// driven by a named expression/animation lookup — see AGENTS.md/CLAUDE.md
+// notes on this package). Each entry below was picked by visually testing
+// candidates in /styleguide: these six read as a coherent, consistently
+// "slit-eyed" family that clearly glances in their named direction (several
+// other expressions render as round surprised eyes or an asymmetric squint
+// instead, so aren't part of the illusion). `angle` is in screen-space
+// degrees (0 = right, 90 = down, matching atan2(dy, dx)); nearest-angle
+// matching means the two uncovered octants (straight up, up-left) fall back
+// to whichever neighbor is angularly closest, not a broken direction.
+const GAZE_DIRECTIONS: { expression: ExpressionKey; angle: number }[] = [
+  { expression: "far-right-glance" as ExpressionKey, angle: 0 },
+  { expression: "playful-right" as ExpressionKey, angle: 45 },
+  { expression: "downward-gaze" as ExpressionKey, angle: 90 },
+  { expression: "wide-down-left" as ExpressionKey, angle: 135 },
+  { expression: "curious-left" as ExpressionKey, angle: 180 },
+  { expression: "upward-side-glance" as ExpressionKey, angle: -45 },
+];
+const GAZE_CENTER = "neutral" as ExpressionKey;
+/** Mouse within this many px of the avatar's center looks straight ahead instead of snapping to a direction. */
+const GAZE_DEADZONE_PX = 48;
+const GAZE_THROTTLE_MS = 90;
+
+function nearestGaze(dx: number, dy: number): ExpressionKey {
+  if (Math.hypot(dx, dy) < GAZE_DEADZONE_PX) return GAZE_CENTER;
+  const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+  let best = GAZE_DIRECTIONS[0];
+  let bestDiff = Infinity;
+  for (const g of GAZE_DIRECTIONS) {
+    const diff = Math.min(Math.abs(angle - g.angle), 360 - Math.abs(angle - g.angle));
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = g;
+    }
+  }
+  return best.expression;
 }
 
 /**
@@ -64,10 +106,30 @@ export function Coach({
   const [open, setOpen] = useState(false);
   const [animation, setAnimation] = useState<AnimationKey>("idle");
   const [bubble, setBubble] = useState<{ text: string; streaming: boolean } | null>(null);
+  const [gaze, setGaze] = useState<ExpressionKey>(GAZE_CENTER);
 
   const mountedRef = useRef(false);
   const prevFeedbackRef = useRef(feedback);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const avatarButtonRef = useRef<HTMLButtonElement>(null);
+  const lastGazeUpdateRef = useRef(0);
+
+  // Eyes follow the cursor while at rest (animation === "idle"); a reaction
+  // animation always takes priority, so this doesn't fight scheduleIdleReturn.
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    function handlePointerMove(e: PointerEvent) {
+      const now = performance.now();
+      if (now - lastGazeUpdateRef.current < GAZE_THROTTLE_MS) return;
+      lastGazeUpdateRef.current = now;
+      const rect = avatarButtonRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const next = nearestGaze(e.clientX - (rect.left + rect.width / 2), e.clientY - (rect.top + rect.height / 2));
+      setGaze((prev) => (prev === next ? prev : next));
+    }
+    window.addEventListener("pointermove", handlePointerMove);
+    return () => window.removeEventListener("pointermove", handlePointerMove);
+  }, []);
 
   function scheduleIdleReturn() {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
@@ -172,41 +234,41 @@ export function Coach({
             </button>
           </div>
           {answered ? (
-              <CoachChat
-                setId={setId}
-                position={position}
-                hintsEnabled={hintsEnabled}
-                wrong={wrong}
-                onEvent={onEvent}
-                onStreaming={(streaming) => {
-                  if (streaming) {
-                    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-                    setAnimation("thinking");
-                  } else {
-                    scheduleIdleReturn();
-                  }
-                }}
-              />
-            ) : (
-              <HintLadder
-                setId={setId}
-                position={position}
-                hintsEnabled={hintsEnabled}
-                gradable={gradable}
-                initialHints={usedHints}
-                onHintUnlocked={onHintUnlocked}
-                onRequestHint={(streaming) => {
-                  if (streaming) {
-                    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-                    setAnimation("thinking");
-                  } else {
-                    scheduleIdleReturn();
-                  }
-                }}
-                onReveal={onReveal}
-                onEvent={onEvent}
-              />
-            )}
+            <CoachChat
+              setId={setId}
+              position={position}
+              hintsEnabled={hintsEnabled}
+              wrong={wrong}
+              onEvent={onEvent}
+              onStreaming={(streaming) => {
+                if (streaming) {
+                  if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+                  setAnimation("thinking");
+                } else {
+                  scheduleIdleReturn();
+                }
+              }}
+            />
+          ) : (
+            <HintLadder
+              setId={setId}
+              position={position}
+              hintsEnabled={hintsEnabled}
+              gradable={gradable}
+              initialHints={usedHints}
+              onHintUnlocked={onHintUnlocked}
+              onRequestHint={(streaming) => {
+                if (streaming) {
+                  if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+                  setAnimation("thinking");
+                } else {
+                  scheduleIdleReturn();
+                }
+              }}
+              onReveal={onReveal}
+              onEvent={onEvent}
+            />
+          )}
         </div>
 
         {bubble && !open && (
@@ -216,12 +278,17 @@ export function Coach({
         )}
 
         <button
+          ref={avatarButtonRef}
           type="button"
           onClick={toggleOpen}
           aria-label={answered ? "Ask the coach about this question" : "Get a hint"}
-          className="flex size-14 shrink-0 items-center justify-center rounded-full bg-card shadow-md ring-1 ring-border transition-transform hover:scale-105"
+          className="flex shrink-0 items-center justify-center rounded-full bg-transparent transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
-          <StrobiAvatar animation={animation} size={44} />
+          {animation === "idle" ? (
+            <StrobiAvatar expression={gaze} size={AVATAR_SIZE} className="drop-shadow-lg" />
+          ) : (
+            <StrobiAvatar animation={animation} size={AVATAR_SIZE} className="drop-shadow-lg" />
+          )}
         </button>
       </div>
     </div>
