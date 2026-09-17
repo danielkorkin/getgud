@@ -1,0 +1,119 @@
+diff --git a/dist/Avatar.d.ts b/dist/Avatar.d.ts
+index a64add85fba51d0968c2d5f43f16ec1d2970d748..d0d9965c554b67126eff5b443c6dde0456551b3d 100644
+--- a/dist/Avatar.d.ts
++++ b/dist/Avatar.d.ts
+@@ -14,11 +14,24 @@ export type AvatarCommandResult = {
+     error: AvatarRuntimeError;
+ };
+ export type AvatarPlaybackState = Pick<CorePlaybackState, 'activeAnimation' | 'activeExpression' | 'status'>;
++export type EyeOffset = Readonly<{
++    x: number;
++    y: number;
++}>;
+ export type AvatarController = {
+     play(animation: AnimationKey): AvatarCommandResult;
+     setExpression(expression: ExpressionKey): AvatarCommandResult;
+     pause(): void;
+     stop(): void;
++    /**
++     * Continuously offset both pupils, in head-surface units, on top of whatever
++     * expression or animation is currently active. Independent of the playback
++     * state machine: it never changes the active expression/animation, works
++     * while one is playing, and repaints immediately without a React re-render —
++     * so it is safe to call at pointer-move or animation-frame rate.
++     */
++    setEyeOffset(offset: EyeOffset | null | undefined): void;
++    getEyeOffset(): EyeOffset;
+     getState(): AvatarPlaybackState;
+ };
+ export type AvatarProps = {
+@@ -37,10 +50,17 @@ export type AvatarProps = {
+     className?: string;
+     style?: CSSProperties;
+     ariaLabel?: string;
++    /**
++     * Declarative form of `AvatarController.setEyeOffset`: offsets both pupils
++     * in head-surface units on top of the active expression or animation. For
++     * high-frequency updates (cursor tracking) prefer the imperative controller
++     * method, which repaints without re-rendering.
++     */
++    eyeOffset?: EyeOffset;
+     /** Receives invalid animation or expression targets supplied through props. */
+     onError?: (error: AvatarRuntimeError) => void;
+     onAnimationEnd?: (animation: AnimationKey) => void;
+     onExpressionChange?: (expression: ExpressionKey) => void;
+ };
+-export declare function Avatar({ definition, ref, animation, expression, defaultAnimation, defaultExpression, autoplay, size, className, style, ariaLabel, onError, onAnimationEnd, onExpressionChange, }: AvatarProps): ReactElement;
++export declare function Avatar({ definition, ref, animation, expression, defaultAnimation, defaultExpression, autoplay, size, className, style, ariaLabel, eyeOffset, onError, onAnimationEnd, onExpressionChange, }: AvatarProps): ReactElement;
+ //# sourceMappingURL=Avatar.d.ts.map
+\ No newline at end of file
+diff --git a/dist/index.d.ts b/dist/index.d.ts
+index a98e779e0bb7b9442b04bb59772872a20536390e..93c644db9ccc67c447299107d14c92eca6cf0f7f 100644
+--- a/dist/index.d.ts
++++ b/dist/index.d.ts
+@@ -1,5 +1,5 @@
+ export { Avatar } from './Avatar';
+ export { createAvatar } from './createAvatar';
+-export type { AvatarCommandResult, AvatarController, AvatarPlaybackState, AvatarProps, AvatarRuntimeError, } from './Avatar';
++export type { AvatarCommandResult, AvatarController, AvatarPlaybackState, AvatarProps, AvatarRuntimeError, EyeOffset, } from './Avatar';
+ export type { CreatedAvatarComponent, CreatedAvatarProps } from './createAvatar';
+ //# sourceMappingURL=index.d.ts.map
+\ No newline at end of file
+diff --git a/dist/index.js b/dist/index.js
+index 8904b2d28a25ff635ec9fa46f43150d26e9dea74..f8cc010df92f83938720b3cb2bc02be89bede998 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -30,21 +30,31 @@ var b = /* @__PURE__ */ new WeakSet(), x = 420, S = e + 2, C = () => ({
+ 		activeExpression: u.ok ? l : "neutral"
+ 	};
+ };
+-function k({ definition: e, ref: d, animation: b, expression: w, defaultAnimation: k, defaultExpression: A, autoplay: j, size: M = 240, className: ee, style: te, ariaLabel: ne = "Procedural avatar", onError: N, onAnimationEnd: P, onExpressionChange: F }) {
++function k({ definition: e, ref: d, animation: b, expression: w, defaultAnimation: k, defaultExpression: A, autoplay: j, size: M = 240, className: ee, style: te, ariaLabel: ne = "Procedural avatar", eyeOffset: _gzProp, onError: N, onAnimationEnd: P, onExpressionChange: F }) {
+ 	D({
+ 		animation: b,
+ 		expression: w,
+ 		defaultAnimation: k,
+ 		defaultExpression: A
+ 	}), T(e);
+-	let I = `${p().replaceAll(":", "")}-head`, L = g(null), R = g(null), z = g(null), B = g(null), V = g([]), H = g([]), U = g(!1), W = g(void 0), G = g(null), K = g(null), q = g(e), [J, Y] = _(() => O(e, b, w, k, A)), X = (e) => {
++	let I = `${p().replaceAll(":", "")}-head`, L = g(null), R = g(null), z = g(null), B = g(null), V = g([]), H = g([]), U = g(!1), W = g(void 0), G = g(null), K = g(null), q = g(e), _gzRef = g({
++		x: 0,
++		y: 0
++	}), [J, Y] = _(() => O(e, b, w, k, A)), X = (e) => {
+ 		R.current?.setAttribute("d", e.geometry.headPath), L.current?.setAttribute("d", e.geometry.headPath), R.current?.setAttribute("fill", e.colors.body), z.current?.setAttribute("d", e.geometry.leftPath), z.current?.setAttribute("fill", e.colors.eyes), z.current?.setAttribute("opacity", e.geometry.leftVisible ? "1" : "0"), B.current?.setAttribute("d", e.geometry.rightPath), B.current?.setAttribute("fill", e.colors.eyes), B.current?.setAttribute("opacity", e.geometry.rightVisible ? "1" : "0"), V.current.forEach((t, n) => {
+ 			t?.setAttribute("d", e.geometry.backPaths[n] ?? ""), t?.setAttribute("fill", e.colors.body);
+ 		}), H.current.forEach((t, n) => {
+ 			t?.setAttribute("d", e.geometry.frontPaths[n] ?? ""), t?.setAttribute("fill", e.colors.body);
+ 		});
+-	}, Z = (t, n, r) => (K.current = u(e, t, n, r), o(e, t, n, r));
++	}, Z = (t, n, r) => (K.current = u(e, t, n, r), o(e, t, n, r, _gzRef.current)), _gzApply = () => {
++		let t = G.current ?? n(), r = performance.now();
++		X(Z(t, r, C()));
++	};
+ 	h(() => {
++		_gzProp && (_gzRef.current = {
++			x: _gzProp.x ?? 0,
++			y: _gzProp.y ?? 0
++		});
+ 		let e = G.current ?? J, t = performance.now(), n = C();
+ 		X(Z(e, t, n));
+ 	}), f(() => {
+@@ -193,6 +203,18 @@ function k({ definition: e, ref: d, animation: b, expression: w, defaultAnimatio
+ 				G.current = e, Y(e);
+ 			}
+ 		},
++		setEyeOffset(e) {
++			_gzRef.current = e ? {
++				x: e.x ?? 0,
++				y: e.y ?? 0
++			} : {
++				x: 0,
++				y: 0
++			}, _gzApply();
++		},
++		getEyeOffset() {
++			return _gzRef.current;
++		},
+ 		getState() {
+ 			let e = G.current ?? n();
+ 			return {

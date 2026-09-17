@@ -6,8 +6,12 @@
 // main product surface, worth knowing if this repo's licensing posture
 // ever needs revisiting.
 import { useEffect, useRef, useState } from "react";
-import { StrobiAvatar, strobiDefinition } from "@/components/procedural-avatar/strobi-avatar";
-import { computeGazeKey, GAZE_NEUTRAL, type ExpressionKey } from "@/components/practice/coach/continuous-gaze";
+import {
+  StrobiAvatar,
+  strobiDefinition,
+  type AvatarController,
+} from "@/components/procedural-avatar/strobi-avatar";
+import { useCursorGaze } from "@/components/practice/coach/continuous-gaze";
 import { HintLadder, CoachChat, type HintEntry } from "@/components/practice/coach/coach-panel";
 import { streamPlainText } from "@/components/practice/coach/coach-stream";
 import type { RevealedFeedback } from "@/actions/attempts";
@@ -30,8 +34,6 @@ const AVATAR_SIZE = 84;
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
-
-const GAZE_THROTTLE_MS = 50;
 
 /**
  * The floating coach: an avatar that reacts to each submission, a feedback
@@ -68,33 +70,16 @@ export function Coach({
   const [open, setOpen] = useState(false);
   const [animation, setAnimation] = useState<AnimationKey>("idle");
   const [bubble, setBubble] = useState<{ text: string; streaming: boolean } | null>(null);
-  const [gaze, setGaze] = useState<ExpressionKey>(GAZE_NEUTRAL);
 
   const mountedRef = useRef(false);
   const prevFeedbackRef = useRef(feedback);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const avatarButtonRef = useRef<HTMLButtonElement>(null);
-  const lastGazeUpdateRef = useRef(0);
+  const avatarRef = useRef<AvatarController>(null);
 
-  // Eyes follow the cursor while at rest (animation === "idle"); a reaction
-  // animation always takes priority, so this doesn't fight scheduleIdleReturn.
-  // See continuous-gaze.ts for why this is a fine-grained bucket lookup
-  // rather than truly continuous values.
-  useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    function handlePointerMove(e: PointerEvent) {
-      const now = performance.now();
-      if (now - lastGazeUpdateRef.current < GAZE_THROTTLE_MS) return;
-      lastGazeUpdateRef.current = now;
-      const rect = avatarButtonRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const dx = e.clientX - (rect.left + rect.width / 2);
-      const dy = e.clientY - (rect.top + rect.height / 2);
-      setGaze(computeGazeKey(dx, dy));
-    }
-    window.addEventListener("pointermove", handlePointerMove);
-    return () => window.removeEventListener("pointermove", handlePointerMove);
-  }, []);
+  // Gaze rides on top of the animation rather than replacing it, so the eyes
+  // keep tracking the cursor through every reaction too.
+  useCursorGaze(avatarRef, avatarButtonRef);
 
   function scheduleIdleReturn() {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
@@ -249,11 +234,12 @@ export function Coach({
           aria-label={answered ? "Ask the coach about this question" : "Get a hint"}
           className="flex shrink-0 items-center justify-center rounded-full bg-transparent transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
-          {animation === "idle" ? (
-            <StrobiAvatar expression={gaze} size={AVATAR_SIZE} className="drop-shadow-lg" />
-          ) : (
-            <StrobiAvatar animation={animation} size={AVATAR_SIZE} className="drop-shadow-lg" />
-          )}
+          <StrobiAvatar
+            ref={avatarRef}
+            animation={animation}
+            size={AVATAR_SIZE}
+            className="drop-shadow-lg"
+          />
         </button>
       </div>
     </div>

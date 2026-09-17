@@ -187,18 +187,9 @@ Server Actions live in `src/actions/` (`profile.ts`, `sets.ts`,
 reaction bubble, hint ladder, and post-answer chat — see its file comments
 for the mood state machine and why the reaction effect defers its `setState`
 calls a tick (avoiding `react-hooks/set-state-in-effect`, same idiom as
-`set-builder-form.tsx`'s count-loading effect). The idle avatar's eyes track
-the cursor (`continuous-gaze.ts`) via 24 pre-baked `gaze-NNN` expressions in
-`src/avatars/strobi.avatar.json` (15° apart, field-wise interpolated from a
-handful of the avatar's built-in expressions confirmed by eye to read as
-clean directional gazes), picked by nearest angle. **This is pre-baked, not
-computed at runtime, because `@bible-strong/avatar-core`'s `createAvatar`
-validates its `definition` argument once and renders from a deep-frozen
-*clone* — mutating `strobiDefinition.expressions` after the avatar is
-created is invisible to it** (confirmed empirically: it logs `[Avatar]
-Unknown expression '<key>'` and ignores the update). Any future attempt at
-continuous/procedural expressions needs to go through this same constraint,
-not around it.
+`set-builder-form.tsx`'s count-loading effect). The avatar's eyes follow the
+cursor continuously (`continuous-gaze.ts`'s `useCursorGaze`) — see
+"Patched avatar packages" below for how, and why that needed a patch.
 Rendering (MathML/LaTeX → KaTeX, sanitized) is `src/lib/content/render.ts` —
 see its file comment and `src/lib/content/latex-hygiene.ts` for the small,
 verified fixup pass it applies before handing LaTeX to KaTeX. Question
@@ -266,6 +257,45 @@ the calculator renders permanently blank. `practice-runner.tsx` keeps every
 drawer panel (`calculator`/`reference`/`hint`/`notes`) mounted at all times
 and toggles visibility with `hidden` instead — see its comment above the
 `<aside>`.
+
+## Patched avatar packages
+
+`@bible-strong/avatar-core` and `@bible-strong/avatar-react` are **patched**
+via pnpm (`patches/*.patch`, registered under `patchedDependencies` in
+`pnpm-workspace.yaml`). `pnpm install` reapplies them; don't hand-edit
+`node_modules`. To change a patch, run
+`pnpm patch @bible-strong/avatar-react@0.1.0`, edit the printed directory,
+then `pnpm patch-commit <that directory>`. Both packages are AGPL-3.0-only.
+
+**What the patch adds: a continuous `eyeOffset` that is independent of the
+expression and animation systems.** The published React component only
+accepts *named* expression/animation keys, so the eyes can only ever be
+where some author-defined expression put them. `avatar-core`'s geometry
+layer, though, already supports a free-form eye offset —
+`RenderAvatarOptions.eyeOffset`, applied additively to each pupil in
+head-surface units before the shape is rotated and projected — but nothing
+ever threaded it up through `renderAvatarFrame` to React. The patch wires
+that path (`renderAvatarExpression` and `renderAvatarFrame` each take an
+optional `eyeOffset`) and exposes it as an `eyeOffset` prop plus an
+imperative `AvatarController.setEyeOffset(offset)` / `getEyeOffset()`.
+
+Three properties worth knowing, because the coach depends on all of them:
+- It is **orthogonal to playback** — it never changes the active expression
+  or animation, and unlike `play`/`setExpression` it is deliberately *not*
+  refused when the component is controlled by props. So the eyes keep
+  tracking during reaction animations.
+- It **repaints without a React re-render**: the component already applies
+  each frame imperatively via refs, so `setEyeOffset` just re-applies the
+  scene. Safe to call at pointer-move or animation-frame rate.
+- It is genuinely continuous — a 1.5-unit offset renders differently from a
+  0-unit one, so there is no bucketing anywhere in this path.
+
+Before this existed, cursor tracking here was faked by snapping between
+pre-baked directional expressions. If you ever need something similar again,
+note the constraint that forced the patch: `createAvatar` validates its
+definition once and renders from a **deep-frozen clone**, so injecting
+expressions into `strobiDefinition` at runtime does nothing (the avatar logs
+`[Avatar] Unknown expression '<key>'` and ignores it).
 
 ## Premade exams
 

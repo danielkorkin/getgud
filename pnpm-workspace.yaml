@@ -4,3 +4,6 @@ allowBuilds:
   sharp: false
   unrs-resolver: false
   workerd: false
+patchedDependencies:
+  '@bible-strong/avatar-core@0.1.0': patches/@bible-strong__avatar-core@0.1.0.patch
+  '@bible-strong/avatar-react@0.1.0': patches/@bible-strong__avatar-react@0.1.0.patch

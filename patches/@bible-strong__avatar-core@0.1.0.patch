@@ -1,0 +1,59 @@
+diff --git a/dist/index.js b/dist/index.js
+index 6e768dc3582dcc58b37316b892cabf1ff65ac282..f6342ca04ce559526d3e82ce8bf134cd07c2199f 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -640,10 +640,10 @@ var k = {
+ 		position: [...e.position],
+ 		rotation: [...e.rotation]
+ 	}))
+-}), W = (e, t, n = {}, r = 1) => {
++}), W = (e, t, n = {}, r = 1, _gaze) => {
+ 	let i = U(e.body);
+ 	return {
+-		geometry: g(m(t), i.primary, r, { bodyNodes: i.nodes }),
++		geometry: g(m(t), i.primary, r, { bodyNodes: i.nodes, eyeOffset: _gaze }),
+ 		colors: {
+ 			body: n.body ?? t.bodyColor ?? e.colors.body,
+ 			eyes: n.eyes ?? t.eyeColor ?? e.colors.eyes
+@@ -847,9 +847,9 @@ var k = {
+ 		blink: c,
+ 		sampledAt: i
+ 	};
+-}, Fe = (e, t, n, i) => {
++}, Fe = (e, t, n, i, _gaze) => {
+ 	let a = $(e, t, n, i);
+-	return W(e, i.reduceMotion ? a.expression : r(a.expression, a.sampledAt), a.colors, a.blink);
++	return W(e, i.reduceMotion ? a.expression : r(a.expression, a.sampledAt), a.colors, a.blink, _gaze);
+ };
+ //#endregion
+ export { A as AVATAR_DEFINITION_MAX_BYTES, j as AVATAR_DEFINITION_MAX_DEPTH, se as MAX_BODY_NODES, u as RADIUS, N as SEMANTIC_KEY_PATTERN, Me as advanceAvatarPlayback, e as ambientBodyOffset, t as ambientEyeOffset, n as applyAmbientBodyMotion, r as applyAmbientMotion, Oe as avatarDefinitionFileName, d as axisVector, Q as blinkOpacityAt, U as bodyFromDefinition, i as bodyMotionModes, ce as bodyPrimitiveTypes, f as clamp, K as createAvatarPlaybackState, le as createBodyNode, ee as cursorLayout, ue as duplicateBodyNode, fe as expressionFields, H as expressionFromDefinition, pe as expressionWithOrientation, a as eyeMotionModes, P as getSemanticKeyIssue, o as hasAmbientMotion, p as interpolatePose, s as isBodyMotion, c as isEyeMotion, me as multiplyQuaternions, he as normalizeQuaternion, de as parseAvatarBody, De as parseAvatarDefinition, l as parseSurfaceConfig, Ne as pauseAvatarPlayback, je as playAvatarAnimation, m as poseFromExpression, ge as quaternionFromAxisAngle, _e as quaternionFromEuler, ve as quaternionFromVectors, ye as quaternionToEuler, h as radians, g as renderAvatar, ke as renderAvatarDefinition, W as renderAvatarExpression, Fe as renderAvatarFrame, _ as renderBodyNodeEditor, v as renderEyeEditor, G as resolveAnimation, Ae as resolveExpression, Pe as resumeAvatarPlayback, y as rotateBodyNodeAroundLocalAxis, b as rotateExpressionAroundAxis, x as rotateExpressionAroundCamera, S as rotateExpressionWithArcball, C as rotateWithQuaternion, w as rotationRing, $ as sampleAvatarFrame, T as slerpQuaternion, te as surfaceFrontSampleAt, ne as surfaceLabels, re as surfaceNormalAt, ie as surfacePointAt, ae as surfacePresets, oe as surfaceSampleAt, E as translateBodyNodeAlongLocalAxis, D as translateBodyNodeInCameraPlane, B as validateAvatarDefinition };
+diff --git a/dist/runtime.d.ts b/dist/runtime.d.ts
+index cfe831405d959e1ecbd444604c0816229942732d..c526d4286a51a9061eb90939a90d90b32fb37041 100644
+--- a/dist/runtime.d.ts
++++ b/dist/runtime.d.ts
+@@ -53,5 +53,8 @@ export declare const sampleAvatarFrame: (definition: Readonly<AvatarDefinition>,
+     blink: number;
+     sampledAt: number;
+ };
+-export declare const renderAvatarFrame: (definition: Readonly<AvatarDefinition>, state: Readonly<AvatarPlaybackState>, now: number, environment: AvatarRuntimeEnvironment) => AvatarScene;
++export declare const renderAvatarFrame: (definition: Readonly<AvatarDefinition>, state: Readonly<AvatarPlaybackState>, now: number, environment: AvatarRuntimeEnvironment, eyeOffset?: Readonly<{
++    x: number;
++    y: number;
++}>) => AvatarScene;
+ //# sourceMappingURL=runtime.d.ts.map
+\ No newline at end of file
+diff --git a/dist/scene.d.ts b/dist/scene.d.ts
+index 299ff0580e485b669c0076080b47e2962c06ed6e..3dbcb29ed18fc42a875a4bf05d4aa322320ec1f3 100644
+--- a/dist/scene.d.ts
++++ b/dist/scene.d.ts
+@@ -13,6 +13,9 @@ export type AvatarScene = {
+ export declare const renderAvatarExpression: (definition: Readonly<AvatarDefinition>, expression: Expression, colors?: {
+     body?: string;
+     eyes?: string;
+-}, blink?: number) => AvatarScene;
++}, blink?: number, eyeOffset?: Readonly<{
++    x: number;
++    y: number;
++}>) => AvatarScene;
+ export declare const renderAvatarDefinition: (definition: Readonly<AvatarDefinition>, expressionKey?: ExpressionKey) => AvatarScene;
+ //# sourceMappingURL=scene.d.ts.map
