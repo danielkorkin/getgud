@@ -11,8 +11,12 @@ equation-image-to-LaTeX conversion pass, and a Postgres loader (see
 [scripts/README.md](./scripts/README.md)) feed a practice-set builder
 (`/new`), a Bluebook-style question runner (`/sets/[id]`) with an answer
 eliminator, mark-for-review, text highlighting + notes, a resizable
-calculator/reference drawer backed by Desmos, an AI hint panel, and instant
-per-question feedback rendered from the official rationale — plus a set
+calculator/reference drawer backed by Desmos, instant per-question feedback
+rendered from the official rationale, and **Strobi** — a floating procedural
+avatar coach whose eyes track your cursor continuously, who reacts to each
+submission, gives a one-line AI takeaway, and holds a progressive 3-level
+hint ladder (then a confirm-gated answer reveal) and a full post-answer chat
+that's saved per question and restored exactly as you left it — plus a set
 library (`/sets`), a results screen, local cookie-based profiles (no
 password), and telemetry capture for a future stats screen. Alongside that,
 `/tests` offers full-length, timed, adaptive SAT practice tests — the same
@@ -118,15 +122,34 @@ password), and build a set at `/new`.
 Both are optional — each feature degrades gracefully (disabled button with an
 explanation) if its key is unset:
 
-- `OPENROUTER_API_KEY` — AI hint panel, via [OpenRouter](https://openrouter.ai/keys).
+- `OPENROUTER_API_KEY` — Strobi's hints, reaction takeaways, and post-answer
+  chat, via [OpenRouter](https://openrouter.ai/keys).
 - `NEXT_PUBLIC_DESMOS_API_KEY` — the runner's calculator, via a free key from
   [desmos.com/api](https://www.desmos.com/api).
+
+## Updating an existing install
+
+After pulling new commits, get the local database and dependencies back in
+sync:
+
+```bash
+pnpm install                # reinstalls deps and reapplies the patched
+                             # @bible-strong/avatar-* packages (see CLAUDE.md)
+pnpm contract:emit          # recompile contract.prisma if it changed
+pnpm prisma db update       # apply any new columns/tables to your existing DB
+```
+
+Then restart `pnpm dev` if it was already running — it loads `contract.json`
+once at boot, so it won't see a schema change from `db update` until it's
+restarted.
 
 ## Stack
 
 - [Next.js](https://nextjs.org) (App Router, Server Actions)
 - [Prisma ORM](https://www.prisma.io) (v8, PostgreSQL)
 - [shadcn/ui](https://ui.shadcn.com) on [Base UI](https://base-ui.com), Tailwind CSS v4
-- [AI SDK](https://ai-sdk.dev) + [`@openrouter/ai-sdk-provider`](https://openrouter.ai) — streaming hint generation
+- [AI SDK](https://ai-sdk.dev) + [`@openrouter/ai-sdk-provider`](https://openrouter.ai) — streaming hints, takeaways, and chat
 - [KaTeX](https://katex.org) — server-side math rendering from MathML/LaTeX
 - [Desmos API](https://www.desmos.com/api) — in-runner graphing/scientific calculator
+- `@bible-strong/avatar-react` / `avatar-core` (patched, AGPL-3.0-only) — Strobi's
+  procedural SVG renderer; see [CLAUDE.md](./CLAUDE.md)'s "Patched avatar packages"
