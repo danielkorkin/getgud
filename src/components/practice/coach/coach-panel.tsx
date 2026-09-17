@@ -134,6 +134,11 @@ export function HintLadder({
       ) : null}
 
       {gradable &&
+        // Gated behind the full ladder — matches the spec ("if the student
+        // can't get it after all hints, reveal answer"). The one exception is
+        // the no-API-key fallback: there is no ladder to climb there, so
+        // Reveal is the only escape hatch and must show immediately.
+        (!hintsEnabled || ladderDone) &&
         (confirmingReveal ? (
           <div className="flex flex-col gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-2.5">
             <p className="text-xs text-muted-foreground">
