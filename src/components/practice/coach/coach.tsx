@@ -30,6 +30,15 @@ const PRAISE = [
 ];
 const IDLE_RETURN_MS = 4000;
 const AVATAR_SIZE = 84;
+/**
+ * Resting animation. Deliberately not Strobi's stock "idle", which alternates
+ * between `upward-side-glance` and `curious-left` — both poses rotate the head
+ * hard (head.y +27.8 / -17.6), so the eyes rest ~49 units right of center and
+ * the entire cursor-tracking range lands right of center too (the avatar
+ * literally cannot look left). `coach-idle` holds `neutral` and blinks, giving
+ * the gaze offset a centered origin and a symmetric range.
+ */
+const IDLE_ANIMATION = "coach-idle" as AnimationKey;
 
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -68,7 +77,7 @@ export function Coach({
   onEvent: (type: EventType, payload?: Record<string, unknown>) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [animation, setAnimation] = useState<AnimationKey>("idle");
+  const [animation, setAnimation] = useState<AnimationKey>(IDLE_ANIMATION);
   const [bubble, setBubble] = useState<{ text: string; streaming: boolean } | null>(null);
 
   const mountedRef = useRef(false);
@@ -83,7 +92,7 @@ export function Coach({
 
   function scheduleIdleReturn() {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-    idleTimerRef.current = setTimeout(() => setAnimation("idle"), IDLE_RETURN_MS);
+    idleTimerRef.current = setTimeout(() => setAnimation(IDLE_ANIMATION), IDLE_RETURN_MS);
   }
 
   async function streamSummary() {

@@ -1702,12 +1702,36 @@
         "description": "Cet état enchaîne un pool de presets et des clignements.",
         "group": "Réactions"
       }
+    },
+    "coach-idle": {
+      "playbackMode": "loop",
+      "steps": [
+        {
+          "expression": "neutral",
+          "holdMs": 5200,
+          "transitionMs": 500,
+          "transition": "smooth"
+        }
+      ],
+      "blink": {
+        "enabled": true,
+        "initialDelayMs": 2600,
+        "minIntervalMs": 3400,
+        "maxIntervalMs": 6200,
+        "durationMs": 280
+      },
+      "metadata": {
+        "label": "coach idle",
+        "description": "Head held at neutral so cursor-tracking eyeOffset has a centered origin; blink only.",
+        "group": "Cycle de vie"
+      }
     }
   },
   "animationOrder": [
     "sleeping",
     "waking",
     "idle",
+    "coach-idle",
     "listening",
     "thinking",
     "searching",
