@@ -8,6 +8,7 @@ import { getOwnedItem } from "@/lib/access";
 import { renderContentField } from "@/lib/content/render";
 import { gradeAnswer, normalizeSprResponse, type AnswerOption } from "@/lib/grading";
 import { toJsonValue } from "@/lib/json";
+import type { CoachMessage } from "@/lib/ai/coach-prompt";
 
 export interface RenderedOption {
   id: string;
@@ -52,6 +53,10 @@ export interface RenderedItemResult {
     highlights: unknown;
     calculatorOpened: boolean;
     referenceOpened: boolean;
+    /** The coach's post-answer chat, in order — restores it exactly on revisit until "Clear chat". */
+    chatMessages: CoachMessage[];
+    /** Wall-clock time to answer (firstViewedAt -> submittedAt), server-recomputed — what the runner's header timer freezes at once answered. */
+    totalMs: number;
   };
   feedback: RevealedFeedback | null;
 }
@@ -192,6 +197,8 @@ export async function getRenderedItem(
       highlights: attempt.highlights,
       calculatorOpened: attempt.calculatorOpened,
       referenceOpened: attempt.referenceOpened,
+      chatMessages: (attempt.chatMessages as CoachMessage[] | null) ?? [],
+      totalMs: attempt.totalMs,
     },
     feedback,
   };
@@ -227,6 +234,8 @@ export interface SubmitAnswerInput {
 export interface SubmitAnswerResult extends RevealedFeedback {
   isCorrect: boolean | null;
   gradable: boolean;
+  /** Same value as `RenderedItemResult.attempt.totalMs` — lets the runner freeze its header timer at the instant of answering without a second fetch. */
+  totalMs: number;
 }
 
 export async function submitAnswer(
@@ -286,6 +295,7 @@ export async function submitAnswer(
   return {
     isCorrect: finalAttempt!.isCorrect,
     gradable: finalAttempt!.gradable,
+    totalMs: finalAttempt!.totalMs,
     rationaleHtml: renderContentField({ html: question.rationale, contentHash: question.contentHash, field: "rationale" }),
     correctOptionId: correctOption?.id ?? null,
     correctLetter: correctOption?.letter ?? null,
@@ -341,11 +351,26 @@ export async function revealAnswer(setId: string, position: number): Promise<Sub
   return {
     isCorrect: finalAttempt!.isCorrect,
     gradable: finalAttempt!.gradable,
+    totalMs: finalAttempt!.totalMs,
     rationaleHtml: renderContentField({ html: question.rationale, contentHash: question.contentHash, field: "rationale" }),
     correctOptionId: correctOption?.id ?? null,
     correctLetter: correctOption?.letter ?? null,
     correctAnswer: question.correctAnswer,
   };
+}
+
+/**
+ * Persists the coach's post-answer chat for this question so leaving and
+ * revisiting it (or the "Clear chat" button, called with `[]`) restores
+ * exactly what was left behind. `getOwnedItem` with no policy argument closes
+ * this to exam-mode sets, same as `submitAnswer`/`revealAnswer`/`/api/coach`
+ * — exam mode has no coach at all.
+ */
+export async function saveCoachChat(setId: string, position: number, messages: CoachMessage[]): Promise<void> {
+  const { item } = await getOwnedItem(setId, position);
+  await db.orm.public.Attempt.where({ id: item.id }).update({
+    chatMessages: toJsonValue(messages),
+  });
 }
 
 // The five functions below (toggleEliminateOption .. recordTime) are shared

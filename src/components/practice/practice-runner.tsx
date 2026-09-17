@@ -18,6 +18,7 @@ import {
 } from "@/actions/attempts";
 import { EventBuffer, ActiveTimeTracker } from "@/lib/events";
 import type { EventType } from "@/lib/event-types";
+import type { CoachMessage } from "@/lib/ai/coach-prompt";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -65,6 +66,9 @@ export function PracticeRunner({
   const [usedHints, setUsedHints] = useState<{ level: number; content: string }[]>([]);
   const [answerRevealed, setAnswerRevealed] = useState(false);
   const [correctStreak, setCorrectStreak] = useState(0);
+  const [chatMessages, setChatMessages] = useState<CoachMessage[]>([]);
+  /** Freezes the header timer's display the instant the question is answered — see `<LiveTimer frozenMs>`. Null while still unanswered. */
+  const [answeredMs, setAnsweredMs] = useState<number | null>(null);
   const [activeDrawer, setActiveDrawer] = useState<DrawerView>(null);
   const [drawerWidth, setDrawerWidth] = useState(384);
   const [desmosMode, setDesmosMode] = useState<"graphing" | "scientific">("graphing");
@@ -113,6 +117,8 @@ export function PracticeRunner({
       setFeedback(result.feedback ? { ...result.feedback, isCorrect: result.attempt.isCorrect } : null);
       setUsedHints(result.attempt.usedHints);
       setAnswerRevealed(result.attempt.answerRevealed);
+      setChatMessages(result.attempt.chatMessages);
+      setAnsweredMs(result.feedback ? result.attempt.totalMs : null);
       setEliminatorMode(false);
       setQuestionStartedAt(Date.now());
       activeTrackerRef.current = new ActiveTimeTracker();
@@ -307,6 +313,7 @@ export function PracticeRunner({
     });
     setFeedback({ ...result, isCorrect: result.isCorrect });
     setCorrectStreak((s) => (result.isCorrect === true ? s + 1 : 0));
+    setAnsweredMs(result.totalMs);
     updateNavItem(position, { status: "answered", isCorrect: result.isCorrect });
     afterFeedbackTrackerRef.current = new ActiveTimeTracker();
     eventBufferRef.current?.record("submit", elapsedSinceStart(), { isCorrect: result.isCorrect });
@@ -321,6 +328,7 @@ export function PracticeRunner({
     setFeedback({ ...result, isCorrect: result.isCorrect });
     setAnswerRevealed(true);
     setCorrectStreak(0);
+    setAnsweredMs(result.totalMs);
     updateNavItem(position, { status: "answered", isCorrect: result.isCorrect, answerRevealed: true });
     afterFeedbackTrackerRef.current = new ActiveTimeTracker();
     eventBufferRef.current?.record("reveal_feedback", elapsedSinceStart());
@@ -440,7 +448,7 @@ export function PracticeRunner({
         </div>
         <div className="flex items-center gap-4 font-mono text-xs text-muted-foreground">
           <span>
-            Question <LiveTimer since={questionStartedAt} />
+            Question <LiveTimer since={questionStartedAt} frozenMs={answeredMs} />
           </span>
         </div>
       </header>
@@ -508,6 +516,7 @@ export function PracticeRunner({
             usedHints={usedHints}
             answerRevealed={answerRevealed}
             correctStreak={correctStreak}
+            initialChatMessages={chatMessages}
             onHintUnlocked={handleHintUnlocked}
             onReveal={handleReveal}
             onEvent={handleCoachEvent}

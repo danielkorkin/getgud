@@ -34,7 +34,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'88ed874dd80355edd447d09efd88807368fc1846502faccda3a42bcc5113a554'>;
+  StorageHashBase<'a5e1f214c6745c1d9769007e439a8a8eb50292950919223cec68b52121272292'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
@@ -283,6 +283,7 @@ export type FieldOutputTypes = {
       readonly highlightCount: CodecTypes['pg/int4@1']['output'];
       readonly highlights: CodecTypes['pg/jsonb@1']['output'] | null;
       readonly notes: CodecTypes['pg/text@1']['output'] | null;
+      readonly chatMessages: CodecTypes['pg/jsonb@1']['output'] | null;
     };
     readonly AttemptEvent: {
       readonly id: CodecTypes['pg/text@1']['output'];
@@ -477,6 +478,7 @@ export type FieldInputTypes = {
       readonly highlightCount: CodecTypes['pg/int4@1']['input'];
       readonly highlights: CodecTypes['pg/jsonb@1']['input'] | null;
       readonly notes: CodecTypes['pg/text@1']['input'] | null;
+      readonly chatMessages: CodecTypes['pg/jsonb@1']['input'] | null;
     };
     readonly AttemptEvent: {
       readonly id: CodecTypes['pg/text@1']['input'];
@@ -636,6 +638,7 @@ export type StorageColumnTypes = {
       readonly assessment: CodecTypes['pg/text@1']['output'];
       readonly calculatorOpened: CodecTypes['pg/bool@1']['output'];
       readonly calculatorOpenMs: CodecTypes['pg/int4@1']['output'];
+      readonly chatMessages: CodecTypes['pg/jsonb@1']['output'] | null;
       readonly contentSource: CodecTypes['pg/text@1']['output'];
       readonly difficulty: CodecTypes['pg/text@1']['output'];
       readonly domainCode: CodecTypes['pg/text@1']['output'];
@@ -830,6 +833,7 @@ export type StorageColumnInputTypes = {
       readonly assessment: CodecTypes['pg/text@1']['input'];
       readonly calculatorOpened: CodecTypes['pg/bool@1']['input'];
       readonly calculatorOpenMs: CodecTypes['pg/int4@1']['input'];
+      readonly chatMessages: CodecTypes['pg/jsonb@1']['input'] | null;
       readonly contentSource: CodecTypes['pg/text@1']['input'];
       readonly difficulty: CodecTypes['pg/text@1']['input'];
       readonly domainCode: CodecTypes['pg/text@1']['input'];
@@ -1163,6 +1167,7 @@ export namespace Models {
     highlightCount: CodecTypes['pg/int4@1']['output'];
     highlights: CodecTypes['pg/jsonb@1']['output'] | null;
     notes: CodecTypes['pg/text@1']['output'] | null;
+    chatMessages: CodecTypes['pg/jsonb@1']['output'] | null;
     events: public_AttemptEvent[];
     hints: public_AttemptHint[];
     item: public_PracticeSetItem;
@@ -1549,6 +1554,11 @@ type ContractBase = Omit<
                 readonly notes: {
                   readonly nativeType: 'text';
                   readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
+                readonly chatMessages: {
+                  readonly nativeType: 'jsonb';
+                  readonly codecId: 'pg/jsonb@1';
                   readonly nullable: true;
                 };
               };
@@ -2880,6 +2890,10 @@ type ContractBase = Omit<
                 readonly nullable: true;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
+              readonly chatMessages: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/jsonb@1' };
+              };
             };
             readonly relations: {
               readonly events: {
@@ -2998,6 +3012,7 @@ type ContractBase = Omit<
                 readonly highlightCount: { readonly column: 'highlightCount' };
                 readonly highlights: { readonly column: 'highlights' };
                 readonly notes: { readonly column: 'notes' };
+                readonly chatMessages: { readonly column: 'chatMessages' };
               };
             };
           };

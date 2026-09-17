@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CoachLoader } from "@/components/practice/coach/coach-loader";
 import { streamPlainText } from "@/components/practice/coach/coach-stream";
+import { saveCoachChat } from "@/actions/attempts";
 import { LightbulbIcon, EyeIcon, PaperPlaneTiltIcon, ArrowClockwiseIcon } from "@phosphor-icons/react";
 import type { CoachMessage } from "@/lib/ai/coach-prompt";
 
@@ -177,6 +178,7 @@ export function CoachChat({
   position,
   hintsEnabled,
   wrong,
+  initialMessages,
   onEvent,
   onStreaming,
 }: {
@@ -184,11 +186,13 @@ export function CoachChat({
   position: number;
   hintsEnabled: boolean;
   wrong: boolean;
-  onEvent: (type: "coach_message", payload?: Record<string, unknown>) => void;
+  /** Restores a chat left behind on an earlier visit to this question — see practice-runner.tsx's load effect. */
+  initialMessages: CoachMessage[];
+  onEvent: (type: "coach_message" | "coach_chat_cleared", payload?: Record<string, unknown>) => void;
   /** Drives the avatar's "thinking" mood while a reply streams. */
   onStreaming?: (streaming: boolean) => void;
 }) {
-  const [messages, setMessages] = useState<CoachMessage[]>([]);
+  const [messages, setMessages] = useState<CoachMessage[]>(initialMessages);
   const [draft, setDraft] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -220,8 +224,21 @@ export function CoachChat({
       setError(outcome.error ?? "Couldn't reach the coach right now.");
       return;
     }
+    const finalMessages: CoachMessage[] = [...next, { role: "assistant", content: outcome.text }];
+    setMessages(finalMessages);
     onEvent("coach_message", { role: "assistant" });
     requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ block: "nearest" }));
+    // Fire-and-forget, same convention as saveAnnotations/recordToolUsage —
+    // a lost write here just means the next visit doesn't restore this last
+    // turn, not a scoring or correctness problem.
+    void saveCoachChat(setId, position, finalMessages);
+  }
+
+  function handleClear() {
+    setMessages([]);
+    setError(null);
+    onEvent("coach_chat_cleared");
+    void saveCoachChat(setId, position, []);
   }
 
   if (!hintsEnabled) {
@@ -241,6 +258,17 @@ export function CoachChat({
 
   return (
     <div className="flex flex-col gap-2 p-3">
+      {messages.length > 0 && (
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">
+            {messages.length} message{messages.length === 1 ? "" : "s"}
+          </span>
+          <Button variant="ghost" size="sm" onClick={handleClear}>
+            Clear chat
+          </Button>
+        </div>
+      )}
+
       {messages.length === 0 && (
         <div className="flex flex-col gap-1.5">
           <p className="text-xs text-muted-foreground">Ask about this question, or try:</p>

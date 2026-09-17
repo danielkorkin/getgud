@@ -15,6 +15,7 @@ import { useCursorGaze } from "@/components/practice/coach/continuous-gaze";
 import { HintLadder, CoachChat, type HintEntry } from "@/components/practice/coach/coach-panel";
 import { streamPlainText } from "@/components/practice/coach/coach-stream";
 import type { RevealedFeedback } from "@/actions/attempts";
+import type { CoachMessage } from "@/lib/ai/coach-prompt";
 import type { EventType } from "@/lib/event-types";
 import { XIcon } from "@phosphor-icons/react";
 
@@ -59,6 +60,7 @@ export function Coach({
   usedHints,
   answerRevealed,
   correctStreak,
+  initialChatMessages,
   onHintUnlocked,
   onReveal,
   onEvent,
@@ -70,6 +72,8 @@ export function Coach({
   feedback: Feedback | null;
   usedHints: HintEntry[];
   answerRevealed: boolean;
+  /** Restores the coach chat left behind on an earlier visit to this question. */
+  initialChatMessages: CoachMessage[];
   /** Correct-in-a-row count going into (and including) this question's outcome — drives celebrate vs. plain happy. */
   correctStreak: number;
   onHintUnlocked: () => void;
@@ -198,6 +202,7 @@ export function Coach({
               position={position}
               hintsEnabled={hintsEnabled}
               wrong={wrong}
+              initialMessages={initialChatMessages}
               onEvent={onEvent}
               onStreaming={(streaming) => {
                 if (streaming) {

@@ -97,6 +97,13 @@
                   "kind": "scalar"
                 }
               },
+              "chatMessages": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/jsonb@1",
+                  "kind": "scalar"
+                }
+              },
               "contentSource": {
                 "nullable": false,
                 "type": {
@@ -459,6 +466,9 @@
                 },
                 "calculatorOpened": {
                   "column": "calculatorOpened"
+                },
+                "chatMessages": {
+                  "column": "chatMessages"
                 },
                 "contentSource": {
                   "column": "contentSource"
@@ -2409,6 +2419,11 @@
                   "nativeType": "bool",
                   "nullable": false
                 },
+                "chatMessages": {
+                  "codecId": "pg/jsonb@1",
+                  "nativeType": "jsonb",
+                  "nullable": true
+                },
                 "contentSource": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
@@ -4016,7 +4031,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "88ed874dd80355edd447d09efd88807368fc1846502faccda3a42bcc5113a554"
+    "storageHash": "a5e1f214c6745c1d9769007e439a8a8eb50292950919223cec68b52121272292"
   },
   "capabilities": {
     "postgres": {

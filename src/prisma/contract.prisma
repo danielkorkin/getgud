@@ -261,6 +261,7 @@ model Attempt {
   highlightCount      Int      @default(0)
   highlights          Jsonb? // [{ start, end, text, color, createdAt }]
   notes               String?
+  chatMessages        Jsonb? // post-answer coach chat: [{ role, content }] — reset on "Clear chat"
 
   events AttemptEvent[]
   hints  AttemptHint[]

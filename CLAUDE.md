@@ -189,7 +189,21 @@ for the mood state machine and why the reaction effect defers its `setState`
 calls a tick (avoiding `react-hooks/set-state-in-effect`, same idiom as
 `set-builder-form.tsx`'s count-loading effect). The avatar's eyes follow the
 cursor continuously (`continuous-gaze.ts`'s `useCursorGaze`) — see
-"Patched avatar packages" below for how, and why that needed a patch.
+"Patched avatar packages" below for how, and why that needed a patch. The
+post-answer chat persists to `Attempt.chatMessages` (a `Jsonb?` column, same
+shape as `highlights`) via `saveCoachChat` after every completed turn and on
+"Clear chat" (called with `[]`) — restoring it exactly on a later visit is
+just `getRenderedItem` reading that column back, no extra query. Like every
+other coach/hint action, `saveCoachChat` calls `getOwnedItem` with no policy
+argument, closing it to exam-mode sets.
+
+The runner's header timer (`live-timer.tsx`'s `LiveTimer`) freezes the
+instant a question is answered — pass `frozenMs` (from `SubmitAnswerResult`/
+`RenderedItemResult.attempt.totalMs`, the same server-recomputed value
+`submitAnswer`/`revealAnswer` already persist) and it stops its interval
+entirely rather than continuing to tick while the student reads the
+rationale or chats with the coach. `Attempt.totalMs` was already tracked for
+analytics; this only had to expose it to the client and freeze the display.
 Rendering (MathML/LaTeX → KaTeX, sanitized) is `src/lib/content/render.ts` —
 see its file comment and `src/lib/content/latex-hygiene.ts` for the small,
 verified fixup pass it applies before handing LaTeX to KaTeX. Question

@@ -30,6 +30,7 @@ export const EVENT_TYPES = [
   "reveal_answer",
   "coach_open",
   "coach_message",
+  "coach_chat_cleared",
 ] as const;
 
 export type EventType = (typeof EVENT_TYPES)[number];
