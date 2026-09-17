@@ -187,7 +187,18 @@ Server Actions live in `src/actions/` (`profile.ts`, `sets.ts`,
 reaction bubble, hint ladder, and post-answer chat — see its file comments
 for the mood state machine and why the reaction effect defers its `setState`
 calls a tick (avoiding `react-hooks/set-state-in-effect`, same idiom as
-`set-builder-form.tsx`'s count-loading effect).
+`set-builder-form.tsx`'s count-loading effect). The idle avatar's eyes track
+the cursor (`continuous-gaze.ts`) via 24 pre-baked `gaze-NNN` expressions in
+`src/avatars/strobi.avatar.json` (15° apart, field-wise interpolated from a
+handful of the avatar's built-in expressions confirmed by eye to read as
+clean directional gazes), picked by nearest angle. **This is pre-baked, not
+computed at runtime, because `@bible-strong/avatar-core`'s `createAvatar`
+validates its `definition` argument once and renders from a deep-frozen
+*clone* — mutating `strobiDefinition.expressions` after the avatar is
+created is invisible to it** (confirmed empirically: it logs `[Avatar]
+Unknown expression '<key>'` and ignores the update). Any future attempt at
+continuous/procedural expressions needs to go through this same constraint,
+not around it.
 Rendering (MathML/LaTeX → KaTeX, sanitized) is `src/lib/content/render.ts` —
 see its file comment and `src/lib/content/latex-hygiene.ts` for the small,
 verified fixup pass it applies before handing LaTeX to KaTeX. Question
