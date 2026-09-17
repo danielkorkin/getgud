@@ -27,6 +27,9 @@ export const EVENT_TYPES = [
   "nav_jump",
   "set_start",
   "set_complete",
+  "reveal_answer",
+  "coach_open",
+  "coach_message",
 ] as const;
 
 export type EventType = (typeof EVENT_TYPES)[number];

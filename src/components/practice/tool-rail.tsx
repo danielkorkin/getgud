@@ -8,10 +8,9 @@ import {
   NotePencilIcon,
   CalculatorIcon,
   BookOpenTextIcon,
-  LightbulbIcon,
 } from "@phosphor-icons/react";
 
-export type DrawerView = "calculator" | "reference" | "hint" | "notes" | null;
+export type DrawerView = "calculator" | "reference" | "notes" | null;
 
 export function ToolRail({
   markedForReview,
@@ -19,7 +18,6 @@ export function ToolRail({
   eliminatorMode,
   onToggleEliminatorMode,
   showMathTools,
-  showHint = true,
   activeDrawer,
   onSetActiveDrawer,
   disabled,
@@ -29,8 +27,6 @@ export function ToolRail({
   eliminatorMode: boolean;
   onToggleEliminatorMode: () => void;
   showMathTools: boolean;
-  /** false in the exam runner — hints reveal nothing exam-specific themselves, but a formal test has no hint tool at all. */
-  showHint?: boolean;
   activeDrawer: DrawerView;
   onSetActiveDrawer: (view: DrawerView) => void;
   disabled: boolean;
@@ -75,14 +71,6 @@ export function ToolRail({
             label="Reference sheet"
           />
         </>
-      )}
-      {showHint && (
-        <RailButton
-          pressed={activeDrawer === "hint"}
-          onClick={() => toggleDrawer("hint")}
-          icon={<LightbulbIcon />}
-          label="Hint"
-        />
       )}
     </div>
   );

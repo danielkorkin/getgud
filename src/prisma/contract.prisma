@@ -254,6 +254,7 @@ model Attempt {
   eliminationCount    Int      @default(0)
   hintsUsed           Int      @default(0)
   maxHintLevel        Int      @default(0)
+  answerRevealed      Boolean  @default(false) // gave up and used "Reveal answer" — scored wrong
   calculatorOpened    Boolean  @default(false)
   calculatorOpenMs    Int      @default(0)
   referenceOpened     Boolean  @default(false)
@@ -287,7 +288,7 @@ model AttemptEvent {
   // eliminate_option | restore_option | mark_review | hint_request | hint_shown |
   // calc_open | calc_close | reference_open | highlight_add | highlight_remove |
   // note_save | submit | reveal_feedback | nav_next | nav_prev | nav_jump |
-  // set_start | set_complete
+  // set_start | set_complete | reveal_answer | coach_open | coach_message
   atMs     Int // ms since attempt start, client clock
   clientAt TimestamptzString
 

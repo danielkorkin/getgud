@@ -6,7 +6,15 @@ import { domainLabel, skillLabel } from "@/lib/catalog";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircleIcon, XCircleIcon, MinusCircleIcon, FlagIcon, ArrowLeftIcon } from "@phosphor-icons/react/dist/ssr";
+import {
+  CheckCircleIcon,
+  XCircleIcon,
+  MinusCircleIcon,
+  FlagIcon,
+  ArrowLeftIcon,
+  LightbulbIcon,
+  EyeIcon,
+} from "@phosphor-icons/react/dist/ssr";
 
 const DIFFICULTY_VARIANT = { E: "tag-green", M: "tag-yellow", H: "tag-red" } as const;
 
@@ -35,6 +43,7 @@ export default async function ResultsPage({ params }: PageProps<"/sets/[id]/resu
 
   const accuracy = set.gradedCount > 0 ? Math.round((set.correctCount / set.gradedCount) * 100) : null;
   const totalHints = attempts.reduce((sum, a) => sum + a.hintsUsed, 0);
+  const revealedCount = attempts.filter((a) => a.answerRevealed).length;
   const avgActiveMs = attempts.length > 0 ? Math.round(set.totalActiveMs / attempts.length) : 0;
 
   const bySkill = new Map<string, { correct: number; graded: number }>();
@@ -60,11 +69,12 @@ export default async function ResultsPage({ params }: PageProps<"/sets/[id]/resu
         </p>
       </header>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         <StatCard label="Accuracy" value={accuracy !== null ? `${accuracy}%` : "—"} />
         <StatCard label="Graded" value={`${set.gradedCount}/${set.questionCount}`} />
         <StatCard label="Avg. time / question" value={formatDuration(avgActiveMs)} />
         <StatCard label="Hints used" value={String(totalHints)} />
+        <StatCard label="Revealed" value={String(revealedCount)} />
       </div>
 
       {bySkill.size > 0 && (
@@ -112,6 +122,12 @@ export default async function ResultsPage({ params }: PageProps<"/sets/[id]/resu
                 </Badge>
                 {attempt?.markedForReview && (
                   <FlagIcon weight="fill" className="size-4 shrink-0 text-tag-yellow-foreground" />
+                )}
+                {(attempt?.hintsUsed ?? 0) > 0 && (
+                  <LightbulbIcon weight="fill" className="size-4 shrink-0 text-tag-blue-foreground" />
+                )}
+                {attempt?.answerRevealed && (
+                  <EyeIcon weight="fill" className="size-4 shrink-0 text-tag-red-foreground" />
                 )}
                 <span className="shrink-0 font-mono text-xs text-muted-foreground">
                   {formatDuration(attempt?.activeMs ?? 0)}

@@ -29,6 +29,8 @@ export default async function RunnerPage({ params }: PageProps<"/sets/[id]">) {
       status: (attempt?.status ?? "unanswered") as NavItemState["status"],
       isCorrect: attempt?.isCorrect ?? null,
       markedForReview: attempt?.markedForReview ?? false,
+      usedHint: (attempt?.hintsUsed ?? 0) > 0,
+      answerRevealed: attempt?.answerRevealed ?? false,
     };
   });
 

@@ -45,6 +45,9 @@ export interface RenderedItemResult {
     eliminatedOptionIds: readonly string[];
     hintsUsed: number;
     maxHintLevel: number;
+    /** Every hint already unlocked for this attempt, low-to-high — restores the coach's hint ladder on reload with no re-fetch. */
+    usedHints: { level: number; content: string }[];
+    answerRevealed: boolean;
     notes: string | null;
     highlights: unknown;
     calculatorOpened: boolean;
@@ -136,6 +139,22 @@ export async function getRenderedItem(
     };
   }
 
+  // Every hint already unlocked for this attempt — restores the coach's hint
+  // ladder on reload with zero AI calls. Skipped entirely when nothing has
+  // been unlocked yet (the common case).
+  let usedHints: RenderedItemResult["attempt"]["usedHints"] = [];
+  if (attempt.maxHintLevel > 0) {
+    const [attemptHints, questionHints] = await Promise.all([
+      db.orm.public.AttemptHint.where({ attemptId: item.id }).all(),
+      db.orm.public.QuestionHint.where({ questionId: question.id }).all(),
+    ]);
+    const contentByLevel = new Map(questionHints.map((h) => [h.level, h.content]));
+    usedHints = attemptHints
+      .map((h) => ({ level: h.level, content: contentByLevel.get(h.level) ?? "" }))
+      .filter((h) => h.content)
+      .sort((a, b) => a.level - b.level);
+  }
+
   return {
     set: { id: set.id, name: set.name, questionCount: set.questionCount, currentIndex: position },
     item: {
@@ -167,6 +186,8 @@ export async function getRenderedItem(
       eliminatedOptionIds: attempt.eliminatedOptionIds,
       hintsUsed: attempt.hintsUsed,
       maxHintLevel: attempt.maxHintLevel,
+      usedHints,
+      answerRevealed: attempt.answerRevealed,
       notes: attempt.notes,
       highlights: attempt.highlights,
       calculatorOpened: attempt.calculatorOpened,
@@ -258,6 +279,61 @@ export async function submitAnswer(
     await db.orm.public.PracticeSet.where({ id: setId }).update({
       gradedCount: set.gradedCount + 1,
       correctCount: isCorrect ? set.correctCount + 1 : set.correctCount,
+    });
+  }
+
+  const finalAttempt = await db.orm.public.Attempt.first({ id: item.id });
+  return {
+    isCorrect: finalAttempt!.isCorrect,
+    gradable: finalAttempt!.gradable,
+    rationaleHtml: renderContentField({ html: question.rationale, contentHash: question.contentHash, field: "rationale" }),
+    correctOptionId: correctOption?.id ?? null,
+    correctLetter: correctOption?.letter ?? null,
+    correctAnswer: question.correctAnswer,
+  };
+}
+
+/**
+ * "Give up and show me the answer" — scores the question wrong (this is a
+ * concession, not a correct submission) and marks `answerRevealed` so the nav
+ * and results page can distinguish it from a genuine wrong attempt. A plain
+ * Server Action, not an AI call — works with no OPENROUTER_API_KEY.
+ * `getOwnedItem` with no policy argument closes this to exam-mode sets, same
+ * as `submitAnswer`.
+ */
+export async function revealAnswer(setId: string, position: number): Promise<SubmitAnswerResult> {
+  const { set, item, question } = await getOwnedItem(setId, position);
+  if (!item.gradable) throw new Error("This question has no published answer to reveal.");
+  const now = new Date().toISOString();
+
+  const attempt = await db.orm.public.Attempt.first({ id: item.id });
+  if (!attempt) throw new Error("View the question before revealing the answer.");
+
+  const options = question.answerOptions as AnswerOption[] | null;
+  const correctOption = options?.find((o) => question.correctKeys.includes(o.id)) ?? null;
+
+  // Idempotent, same guard as submitAnswer — a second reveal (or a reveal
+  // after the question was already answered) just returns the existing state.
+  if (attempt.status !== "answered") {
+    const totalMs = attempt.firstViewedAt
+      ? Math.max(0, new Date(now).getTime() - new Date(attempt.firstViewedAt).getTime())
+      : attempt.totalMs;
+
+    await db.orm.public.Attempt.where({ id: item.id }).update({
+      status: "answered",
+      selectedOptionId: null,
+      selectedLetter: null,
+      isCorrect: false,
+      gradable: true,
+      answerRevealed: true,
+      submittedAt: now,
+      totalMs,
+    });
+
+    // Counts toward gradedCount (a question was resolved) but never
+    // correctCount — giving up is never a correct answer.
+    await db.orm.public.PracticeSet.where({ id: setId }).update({
+      gradedCount: set.gradedCount + 1,
     });
   }
 

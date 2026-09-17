@@ -446,7 +446,6 @@ export function ExamRunner({
           eliminatorMode={eliminatorMode}
           onToggleEliminatorMode={() => setEliminatorMode((v) => !v)}
           showMathTools={isMath}
-          showHint={false}
           activeDrawer={activeDrawer}
           onSetActiveDrawer={handleSetActiveDrawer}
           disabled={current?.item.type !== "mcq"}

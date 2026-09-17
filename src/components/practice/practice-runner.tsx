@@ -6,6 +6,7 @@ import {
   getRenderedItem,
   markVisited,
   submitAnswer,
+  revealAnswer,
   toggleEliminateOption,
   toggleMarkForReview,
   saveAnnotations,
@@ -16,6 +17,7 @@ import {
   type RevealedFeedback,
 } from "@/actions/attempts";
 import { EventBuffer, ActiveTimeTracker } from "@/lib/events";
+import type { EventType } from "@/lib/event-types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,7 +29,7 @@ import { Highlightable, type HighlightSpan } from "@/components/practice/highlig
 import { LiveTimer } from "@/components/practice/live-timer";
 import { DesmosCalculator } from "@/components/practice/desmos-calculator";
 import { ReferenceSheet } from "@/components/practice/reference-sheet";
-import { HintPanel } from "@/components/practice/hint-panel";
+import { Coach } from "@/components/practice/coach/coach";
 import { NotesPanel } from "@/components/practice/notes-panel";
 import { ArrowLeftIcon, ArrowRightIcon, CheckCircleIcon, XCircleIcon } from "@phosphor-icons/react";
 
@@ -60,6 +62,9 @@ export function PracticeRunner({
   const [notes, setNotes] = useState("");
   const [highlights, setHighlights] = useState<HighlightSpan[]>([]);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [usedHints, setUsedHints] = useState<{ level: number; content: string }[]>([]);
+  const [answerRevealed, setAnswerRevealed] = useState(false);
+  const [correctStreak, setCorrectStreak] = useState(0);
   const [activeDrawer, setActiveDrawer] = useState<DrawerView>(null);
   const [drawerWidth, setDrawerWidth] = useState(384);
   const [desmosMode, setDesmosMode] = useState<"graphing" | "scientific">("graphing");
@@ -106,6 +111,8 @@ export function PracticeRunner({
       setNotes(result.attempt.notes ?? "");
       setHighlights((result.attempt.highlights as HighlightSpan[] | null) ?? []);
       setFeedback(result.feedback ? { ...result.feedback, isCorrect: result.attempt.isCorrect } : null);
+      setUsedHints(result.attempt.usedHints);
+      setAnswerRevealed(result.attempt.answerRevealed);
       setEliminatorMode(false);
       setQuestionStartedAt(Date.now());
       activeTrackerRef.current = new ActiveTimeTracker();
@@ -299,11 +306,32 @@ export function PracticeRunner({
       timeToFirstInputMs: elapsedSinceStart(),
     });
     setFeedback({ ...result, isCorrect: result.isCorrect });
+    setCorrectStreak((s) => (result.isCorrect === true ? s + 1 : 0));
     updateNavItem(position, { status: "answered", isCorrect: result.isCorrect });
     afterFeedbackTrackerRef.current = new ActiveTimeTracker();
     eventBufferRef.current?.record("submit", elapsedSinceStart(), { isCorrect: result.isCorrect });
     eventBufferRef.current?.record("reveal_feedback", elapsedSinceStart());
     setSubmitting(false);
+  }
+
+  /** "Give up" from the coach's hint ladder — scores the question wrong and reveals the answer. */
+  async function handleReveal() {
+    if (feedback) return;
+    const result = await revealAnswer(setId, position);
+    setFeedback({ ...result, isCorrect: result.isCorrect });
+    setAnswerRevealed(true);
+    setCorrectStreak(0);
+    updateNavItem(position, { status: "answered", isCorrect: result.isCorrect, answerRevealed: true });
+    afterFeedbackTrackerRef.current = new ActiveTimeTracker();
+    eventBufferRef.current?.record("reveal_feedback", elapsedSinceStart());
+  }
+
+  function handleHintUnlocked() {
+    updateNavItem(position, { usedHint: true });
+  }
+
+  function handleCoachEvent(type: EventType, payload?: Record<string, unknown>) {
+    eventBufferRef.current?.record(type, elapsedSinceStart(), payload);
   }
 
   function goTo(nextPos: number, navType: "nav_next" | "nav_prev" | "nav_jump") {
@@ -429,6 +457,7 @@ export function PracticeRunner({
       />
 
       <div className="flex flex-1 overflow-hidden">
+        <div className="relative flex min-w-0 flex-1">
         <main className="min-w-0 flex-1 overflow-y-auto">
           {loading || !current ? (
             <div className="mx-auto flex max-w-2xl flex-col gap-4 p-6">
@@ -467,6 +496,24 @@ export function PracticeRunner({
             </div>
           )}
         </main>
+
+        {current && !loading && (
+          <Coach
+            key={position}
+            setId={setId}
+            position={position}
+            hintsEnabled={hintsEnabled}
+            gradable={current.item.gradable}
+            feedback={feedback}
+            usedHints={usedHints}
+            answerRevealed={answerRevealed}
+            correctStreak={correctStreak}
+            onHintUnlocked={handleHintUnlocked}
+            onReveal={handleReveal}
+            onEvent={handleCoachEvent}
+          />
+        )}
+        </div>
 
         {/* Contents stay mounted at all times, visibility toggled with `hidden` —
             the calculator in particular must never unmount: next/script's onLoad
@@ -511,16 +558,6 @@ export function PracticeRunner({
           </div>
           <div hidden={activeDrawer !== "reference"} className="min-w-0">
             <ReferenceSheet />
-          </div>
-          <div hidden={activeDrawer !== "hint"} className="min-w-0">
-            {current && (
-              <HintPanel
-                setId={setId}
-                position={position}
-                hintsEnabled={hintsEnabled}
-                onHintShown={(level) => eventBufferRef.current?.record("hint_shown", elapsedSinceStart(), { level })}
-              />
-            )}
           </div>
           <div hidden={activeDrawer !== "notes"} className="min-w-0">
             <NotesPanel

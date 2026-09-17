@@ -69,6 +69,13 @@
                   "kind": "scalar"
                 }
               },
+              "answerRevealed": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
               "assessment": {
                 "nullable": false,
                 "type": {
@@ -440,6 +447,9 @@
                 },
                 "answerChangeCount": {
                   "column": "answerChangeCount"
+                },
+                "answerRevealed": {
+                  "column": "answerRevealed"
                 },
                 "assessment": {
                   "column": "assessment"
@@ -2367,6 +2377,15 @@
                   "nativeType": "int4",
                   "nullable": false
                 },
+                "answerRevealed": {
+                  "codecId": "pg/bool@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": false
+                  },
+                  "nativeType": "bool",
+                  "nullable": false
+                },
                 "assessment": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
@@ -3997,7 +4016,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "ad3c29fa32f5b040eeea2ed3e0eee1850837655655e5f97a39638faed5ddb8e2"
+    "storageHash": "88ed874dd80355edd447d09efd88807368fc1846502faccda3a42bcc5113a554"
   },
   "capabilities": {
     "postgres": {

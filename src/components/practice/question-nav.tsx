@@ -3,13 +3,15 @@
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger, PopoverHeader, PopoverTitle } from "@/components/ui/popover";
-import { FlagIcon, ListIcon } from "@phosphor-icons/react";
+import { FlagIcon, ListIcon, LightbulbIcon, EyeIcon } from "@phosphor-icons/react";
 
 export interface NavItemState {
   position: number;
   status: "unanswered" | "answered" | "skipped";
   isCorrect: boolean | null;
   markedForReview: boolean;
+  usedHint: boolean;
+  answerRevealed: boolean;
 }
 
 export function QuestionNav({
@@ -51,6 +53,13 @@ export function QuestionNav({
               {item.markedForReview && (
                 <FlagIcon weight="fill" className="absolute -top-1.5 -right-1.5 size-3 text-tag-yellow-foreground" />
               )}
+              {item.answerRevealed ? (
+                <EyeIcon weight="fill" className="absolute -bottom-1.5 -right-1.5 size-3 text-tag-red-foreground" />
+              ) : (
+                item.usedHint && (
+                  <LightbulbIcon weight="fill" className="absolute -bottom-1.5 -right-1.5 size-3 text-tag-blue-foreground" />
+                )
+              )}
             </button>
           ))}
         </div>
@@ -59,16 +68,18 @@ export function QuestionNav({
           <Legend swatch="bg-tag-red" label="Incorrect" />
           <Legend swatch="bg-muted" label="Answered" />
           <Legend swatch="border border-border" label="Unanswered" />
+          <Legend icon={<LightbulbIcon weight="fill" className="size-3 text-tag-blue-foreground" />} label="Used a hint" />
+          <Legend icon={<EyeIcon weight="fill" className="size-3 text-tag-red-foreground" />} label="Revealed" />
         </div>
       </PopoverContent>
     </Popover>
   );
 }
 
-function Legend({ swatch, label }: { swatch: string; label: string }) {
+function Legend({ swatch, icon, label }: { swatch?: string; icon?: React.ReactNode; label: string }) {
   return (
     <span className="flex items-center gap-1.5">
-      <span className={cn("size-2.5 rounded-sm", swatch)} />
+      {icon ?? <span className={cn("size-2.5 rounded-sm", swatch)} />}
       {label}
     </span>
   );

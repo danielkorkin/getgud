@@ -34,7 +34,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'ad3c29fa32f5b040eeea2ed3e0eee1850837655655e5f97a39638faed5ddb8e2'>;
+  StorageHashBase<'88ed874dd80355edd447d09efd88807368fc1846502faccda3a42bcc5113a554'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
@@ -276,6 +276,7 @@ export type FieldOutputTypes = {
       readonly eliminationCount: CodecTypes['pg/int4@1']['output'];
       readonly hintsUsed: CodecTypes['pg/int4@1']['output'];
       readonly maxHintLevel: CodecTypes['pg/int4@1']['output'];
+      readonly answerRevealed: CodecTypes['pg/bool@1']['output'];
       readonly calculatorOpened: CodecTypes['pg/bool@1']['output'];
       readonly calculatorOpenMs: CodecTypes['pg/int4@1']['output'];
       readonly referenceOpened: CodecTypes['pg/bool@1']['output'];
@@ -469,6 +470,7 @@ export type FieldInputTypes = {
       readonly eliminationCount: CodecTypes['pg/int4@1']['input'];
       readonly hintsUsed: CodecTypes['pg/int4@1']['input'];
       readonly maxHintLevel: CodecTypes['pg/int4@1']['input'];
+      readonly answerRevealed: CodecTypes['pg/bool@1']['input'];
       readonly calculatorOpened: CodecTypes['pg/bool@1']['input'];
       readonly calculatorOpenMs: CodecTypes['pg/int4@1']['input'];
       readonly referenceOpened: CodecTypes['pg/bool@1']['input'];
@@ -630,6 +632,7 @@ export type StorageColumnTypes = {
     readonly attempt: {
       readonly activeMs: CodecTypes['pg/int4@1']['output'];
       readonly answerChangeCount: CodecTypes['pg/int4@1']['output'];
+      readonly answerRevealed: CodecTypes['pg/bool@1']['output'];
       readonly assessment: CodecTypes['pg/text@1']['output'];
       readonly calculatorOpened: CodecTypes['pg/bool@1']['output'];
       readonly calculatorOpenMs: CodecTypes['pg/int4@1']['output'];
@@ -823,6 +826,7 @@ export type StorageColumnInputTypes = {
     readonly attempt: {
       readonly activeMs: CodecTypes['pg/int4@1']['input'];
       readonly answerChangeCount: CodecTypes['pg/int4@1']['input'];
+      readonly answerRevealed: CodecTypes['pg/bool@1']['input'];
       readonly assessment: CodecTypes['pg/text@1']['input'];
       readonly calculatorOpened: CodecTypes['pg/bool@1']['input'];
       readonly calculatorOpenMs: CodecTypes['pg/int4@1']['input'];
@@ -1152,6 +1156,7 @@ export namespace Models {
     eliminationCount: CodecTypes['pg/int4@1']['output'];
     hintsUsed: CodecTypes['pg/int4@1']['output'];
     maxHintLevel: CodecTypes['pg/int4@1']['output'];
+    answerRevealed: CodecTypes['pg/bool@1']['output'];
     calculatorOpened: CodecTypes['pg/bool@1']['output'];
     calculatorOpenMs: CodecTypes['pg/int4@1']['output'];
     referenceOpened: CodecTypes['pg/bool@1']['output'];
@@ -1489,6 +1494,15 @@ type ContractBase = Omit<
                   readonly default: {
                     readonly kind: 'literal';
                     readonly value: DefaultLiteralValue<'pg/int4@1', 0>;
+                  };
+                };
+                readonly answerRevealed: {
+                  readonly nativeType: 'bool';
+                  readonly codecId: 'pg/bool@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/bool@1', false>;
                   };
                 };
                 readonly calculatorOpened: {
@@ -2838,6 +2852,10 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
               };
+              readonly answerRevealed: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/bool@1' };
+              };
               readonly calculatorOpened: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/bool@1' };
@@ -2973,6 +2991,7 @@ type ContractBase = Omit<
                 readonly eliminationCount: { readonly column: 'eliminationCount' };
                 readonly hintsUsed: { readonly column: 'hintsUsed' };
                 readonly maxHintLevel: { readonly column: 'maxHintLevel' };
+                readonly answerRevealed: { readonly column: 'answerRevealed' };
                 readonly calculatorOpened: { readonly column: 'calculatorOpened' };
                 readonly calculatorOpenMs: { readonly column: 'calculatorOpenMs' };
                 readonly referenceOpened: { readonly column: 'referenceOpened' };

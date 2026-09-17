@@ -200,6 +200,65 @@
   }
 }
 
+/* Coach (Strobi) UI — bubble entrance, panel entrance, and the small
+   pixel-grid "thinking" loader used while a hint/summary/chat reply
+   streams. Plain @keyframes parse fine under Lightning CSS (only
+   ::highlight() below doesn't) so these can live here unlike that rule. */
+@keyframes coach-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes coach-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes coach-pixel-on {
+  0%,
+  100% {
+    opacity: 0.15;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.coach-bubble {
+  animation: coach-fade-up 250ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+.coach-panel-in {
+  animation: coach-pop-in 150ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+.coach-loader-dot {
+  animation: coach-pixel-on 650ms ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .coach-bubble,
+  .coach-panel-in {
+    animation: none;
+  }
+  .coach-loader-dot {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
 /* Practice-runner text highlighting (CSS Custom Highlight API) — the
    ::highlight() pseudo-element rule that paints it lives in
    src/components/practice/highlightable.tsx as a runtime <style> tag, not

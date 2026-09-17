@@ -19,11 +19,15 @@ for the pipeline stages and `ATTRIBUTION.md` for what's scraped and how
 equations are converted. On top of that: a practice-set builder (`/new`), a
 Bluebook-style runner (`/sets/[id]`) with answer eliminator, mark-for-review,
 text highlighting + notes, a resizable calculator/reference drawer backed by
-Desmos, an AI hint panel, and instant per-question feedback rendered from the
-College Board rationale; a set
+Desmos, instant per-question feedback rendered from the College Board
+rationale, and Strobi — a floating procedural-avatar coach that reacts to
+each submission, gives a one-line AI takeaway before you move on, and holds
+a progressive 3-level hint ladder (then a confirm-gated answer reveal) and a
+full post-answer chat, all with the model's reasoning turned off; a set
 library (`/sets`) and results screen (`/sets/[id]/results`); local
-cookie-based profiles (no auth); two API routes (`/api/hint` streaming,
-`/api/events` telemetry ingest); and a second, formal practice mode —
+cookie-based profiles (no auth); three API routes (`/api/hint` and
+`/api/coach` streaming, `/api/events` telemetry ingest); and a second, formal
+practice mode —
 premade, full-length, timed, adaptive SAT practice tests (`/tests`,
 `/tests/[sessionId]`, `/tests/[sessionId]/results`) that are identical on
 every self-hosted instance. See "Practice-tool app layer" below for the
@@ -38,7 +42,8 @@ pnpm build           # production build (also runs `tsc` type-check)
 pnpm start           # run a production build
 pnpm lint            # eslint
 pnpm contract:emit   # regenerate src/prisma/contract.json + contract.d.ts after editing contract.prisma
-pnpm prisma db init          # create tables in the database from the contract
+pnpm prisma db init          # create tables in the database from the contract (fresh DB)
+pnpm prisma db update        # apply a contract change to an existing DB (run after `contract:emit`, following a pull)
 pnpm prisma migration status # show migration status
 
 # College Board data pipeline — see scripts/README.md for details
@@ -174,8 +179,13 @@ grammar accepts.
 ## Practice-tool app layer
 
 Server Actions live in `src/actions/` (`profile.ts`, `sets.ts`,
-`attempts.ts`, `exams.ts`); the two route handlers are
-`src/app/api/{hint,events}/route.ts`.
+`attempts.ts`, `exams.ts`); the three route handlers are
+`src/app/api/{hint,coach,events}/route.ts`. The coach (`src/components/practice/coach/`,
+`src/lib/ai/coach-prompt.ts`) is the client of `/api/coach`: floating avatar,
+reaction bubble, hint ladder, and post-answer chat — see its file comments
+for the mood state machine and why the reaction effect defers its `setState`
+calls a tick (avoiding `react-hooks/set-state-in-effect`, same idiom as
+`set-builder-form.tsx`'s count-loading effect).
 Rendering (MathML/LaTeX → KaTeX, sanitized) is `src/lib/content/render.ts` —
 see its file comment and `src/lib/content/latex-hygiene.ts` for the small,
 verified fixup pass it applies before handing LaTeX to KaTeX. Question
@@ -278,12 +288,15 @@ revealed).
 **`src/lib/access.ts`'s `getOwnedItem` takes an `ItemAccessPolicy`,
 defaulting to `'practice-only'` — this is the single most important
 correctness mechanism in the whole feature.** Every existing practice
-caller (`getRenderedItem`, `submitAnswer`, `completeSet`, `POST
-/api/hint`) keeps calling it with no policy argument, which is what closes
-those routes to exam-mode sets automatically: `getRenderedItem` and
-`submitAnswer` reveal the rationale and correct answer for any answered
-attempt, so leaving this gate un-defaulted would leak exam answers
-mid-test. `toggleEliminateOption`/`toggleMarkForReview`/`saveAnnotations`
+caller (`getRenderedItem`, `submitAnswer`, `revealAnswer`, `completeSet`,
+`POST /api/hint`, `POST /api/coach`) keeps calling it with no policy
+argument, which is what closes those routes to exam-mode sets
+automatically: `getRenderedItem` and `submitAnswer` reveal the rationale and
+correct answer for any answered attempt, so leaving this gate un-defaulted
+would leak exam answers mid-test — the same reasoning is why `/api/coach`
+additionally refuses to run at all until `Attempt.status === 'answered'`,
+even in practice mode (see its file comment).
+`toggleEliminateOption`/`toggleMarkForReview`/`saveAnnotations`
 pass `'exam-write'` and `recordTime`/`recordToolUsage` pass
 `'exam-telemetry'` explicitly, so those five shared functions work for both
 modes: the policy is a no-op for `mode: 'practice'` sets and enforces the
