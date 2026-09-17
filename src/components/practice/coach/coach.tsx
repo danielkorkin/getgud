@@ -1,5 +1,10 @@
 "use client";
 
+// Note: @bible-strong/avatar-react / -core (StrobiAvatar's renderer) are
+// AGPL-3.0-only. They were already a dependency, rendered only on
+// /styleguide before this — this is the first time Strobi appears on the
+// main product surface, worth knowing if this repo's licensing posture
+// ever needs revisiting.
 import { useEffect, useRef, useState } from "react";
 import { StrobiAvatar, strobiDefinition } from "@/components/procedural-avatar/strobi-avatar";
 import { HintLadder, CoachChat, type HintEntry } from "@/components/practice/coach/coach-panel";
@@ -140,22 +145,33 @@ export function Coach({
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-end p-4">
       <div className="pointer-events-auto flex flex-col items-end gap-2">
-        {open && (
-          <div className="coach-panel-in flex max-h-[60vh] w-80 flex-col overflow-y-auto rounded-lg border border-border bg-popover shadow-md">
-            <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-2">
-              <span className="text-sm font-medium">
-                {answered ? "Ask about this question" : "Need a hint?"}
-              </span>
-              <button
-                type="button"
-                aria-label="Close"
-                onClick={() => setOpen(false)}
-                className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                <XIcon className="size-3.5" />
-              </button>
-            </div>
-            {answered ? (
+        {
+          // `hidden`, not unmounted on close — HintLadder/CoachChat hold their
+          // own in-progress state (unlocked hints, chat history) that must
+          // survive closing the panel to read the passage and reopening it;
+          // only navigating to a new question (Coach's key={position} remount
+          // in practice-runner.tsx) should reset that state. Same "stays
+          // mounted, toggle hidden" convention practice-runner.tsx itself uses
+          // for the calculator/reference/notes drawers.
+        }
+        <div
+          hidden={!open}
+          className="coach-panel-in flex max-h-[60vh] w-80 flex-col overflow-y-auto rounded-lg border border-border bg-popover shadow-md"
+        >
+          <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-2">
+            <span className="text-sm font-medium">
+              {answered ? "Ask about this question" : "Need a hint?"}
+            </span>
+            <button
+              type="button"
+              aria-label="Close"
+              onClick={() => setOpen(false)}
+              className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <XIcon className="size-3.5" />
+            </button>
+          </div>
+          {answered ? (
               <CoachChat
                 setId={setId}
                 position={position}
@@ -191,8 +207,7 @@ export function Coach({
                 onEvent={onEvent}
               />
             )}
-          </div>
-        )}
+        </div>
 
         {bubble && !open && (
           <div className="coach-bubble max-w-72 rounded-lg border border-border bg-popover px-3 py-2 text-sm leading-relaxed text-popover-foreground shadow-md">

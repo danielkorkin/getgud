@@ -44,6 +44,8 @@ pnpm lint            # eslint
 pnpm contract:emit   # regenerate src/prisma/contract.json + contract.d.ts after editing contract.prisma
 pnpm prisma db init          # create tables in the database from the contract (fresh DB)
 pnpm prisma db update        # apply a contract change to an existing DB (run after `contract:emit`, following a pull)
+                              #   — a running `pnpm dev` loads contract.json once at boot; restart it after
+                              #     `db update`, or its ORM client won't know about the new column/table.
 pnpm prisma migration status # show migration status
 
 # College Board data pipeline — see scripts/README.md for details

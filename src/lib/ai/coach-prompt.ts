@@ -64,7 +64,7 @@ function buildContext(input: CoachContextInput): string {
     stimulusText ? `Passage:\n${stimulusText}\n` : "",
     `Question:\n${stemText}`,
     optionsText ? `\nChoices:\n${optionsText}` : "",
-    `\nCorrect answer: ${input.correctLetter ?? input.correctAnswer.join(" or ") ?? "(unpublished)"}`,
+    `\nCorrect answer: ${input.correctLetter ?? (input.correctAnswer.length > 0 ? input.correctAnswer.join(" or ") : "(unpublished)")}`,
     rationaleText ? `\nOfficial explanation:\n${rationaleText}` : "",
     `\n${studentAnswer} ${outcome}`,
     hintsText ? `\nHints the student already saw before answering:\n${hintsText}` : "",
