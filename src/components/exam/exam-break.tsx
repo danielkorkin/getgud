@@ -37,7 +37,7 @@ export function ExamBreak({
     <div className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center gap-8 px-6 py-16">
       <div className="flex flex-col items-center gap-3 text-center">
         <CoffeeIcon weight="fill" className="size-10 text-muted-foreground" />
-        <h1 className="font-serif text-3xl tracking-tight">Break</h1>
+        <h1 className="text-3xl font-medium tracking-tight">Break</h1>
         <p className="max-w-sm text-sm text-muted-foreground">
           You&apos;ve finished Reading and Writing. Take a short break before starting Math — or continue right away.
         </p>

@@ -13,7 +13,7 @@ export default async function NewSetPage() {
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-6 py-16">
         <div className="flex flex-col gap-1">
           <span className="text-xs tracking-[0.05em] text-muted-foreground uppercase">New practice set</span>
-          <h1 className="font-serif text-4xl tracking-tight">Build your set</h1>
+          <h1 className="text-4xl font-medium tracking-tight">Build your set</h1>
         </div>
         <SetBuilderForm />
       </div>

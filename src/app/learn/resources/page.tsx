@@ -22,7 +22,7 @@ export default function ResourcesPage() {
 
         <header className="flex flex-col gap-3">
           <span className="text-xs tracking-[0.05em] text-muted-foreground uppercase">Learn</span>
-          <h1 className="font-serif text-4xl tracking-tight">Resources</h1>
+          <h1 className="text-4xl font-medium tracking-tight">Resources</h1>
           <p className="max-w-xl text-sm leading-relaxed text-muted-foreground">
             {RESOURCES.length} resources, {freeCount} of them free. Each one was checked by fetching its URL rather
             than recalling it, and each carries the date that check happened — link rot is the main way a list like

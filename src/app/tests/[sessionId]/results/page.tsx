@@ -89,7 +89,7 @@ export default async function ExamResultsPage({ params }: PageProps<"/tests/[ses
           <ArrowLeftIcon data-icon="inline-start" />
           Back to practice tests
         </Button>
-        <h1 className="font-serif text-4xl tracking-tight">{state.blueprint.name}</h1>
+        <h1 className="text-4xl font-medium tracking-tight">{state.blueprint.name}</h1>
         <p className="text-sm text-muted-foreground">
           Total active time: {formatDuration(totalActiveMs)}
         </p>
@@ -128,7 +128,7 @@ export default async function ExamResultsPage({ params }: PageProps<"/tests/[ses
 
       {bySkill.size > 0 && (
         <section className="flex flex-col gap-3">
-          <h2 className="font-serif text-xl tracking-tight">By skill</h2>
+          <h2 className="text-xl font-medium tracking-tight">By skill</h2>
           <div className="flex flex-col gap-1.5">
             {[...bySkill.entries()].map(([skillCode, { correct, graded }]) => (
               <div key={skillCode} className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2 text-sm">
@@ -143,12 +143,12 @@ export default async function ExamResultsPage({ params }: PageProps<"/tests/[ses
       )}
 
       <section className="flex flex-col gap-3">
-        <h2 className="font-serif text-xl tracking-tight">Reading and Writing — question review</h2>
+        <h2 className="text-xl font-medium tracking-tight">Reading and Writing — question review</h2>
         <ExamReviewAccordion rows={rwRows} />
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="font-serif text-xl tracking-tight">Math — question review</h2>
+        <h2 className="text-xl font-medium tracking-tight">Math — question review</h2>
         <ExamReviewAccordion rows={mathRows} />
       </section>
     </div>

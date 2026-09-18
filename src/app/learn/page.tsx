@@ -35,7 +35,7 @@ export default function LearnPage() {
 
         <header className="flex flex-col gap-3">
           <span className="text-xs tracking-[0.05em] text-muted-foreground uppercase">Learn</span>
-          <h1 className="font-serif text-4xl tracking-tight">Tips, tricks, and courses</h1>
+          <h1 className="text-4xl font-medium tracking-tight">Tips, tricks, and courses</h1>
           <p className="max-w-xl text-sm leading-relaxed text-muted-foreground">
             {GUIDES.length} guides written for this app, plus {RESOURCES.length} hand-checked links to the best
             courses, channels, and official material for the SAT and PSAT. Every link here was verified to resolve
@@ -46,7 +46,7 @@ export default function LearnPage() {
         <Reveal index={0}>
           <section className="flex flex-col gap-4">
             <div className="flex items-center justify-between gap-4">
-              <h2 className="font-serif text-xl tracking-tight">Start here</h2>
+              <h2 className="text-xl font-medium tracking-tight">Start here</h2>
               <Button variant="ghost" size="sm" render={<Link href="/learn/guides" />} nativeButton={false}>
                 All guides
                 <ArrowRightIcon data-icon="inline-end" />
@@ -66,7 +66,7 @@ export default function LearnPage() {
             <Reveal key={section.code} index={sectionIndex + 1}>
               <section className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1">
-                  <h2 className="font-serif text-xl tracking-tight">{section.label}</h2>
+                  <h2 className="text-xl font-medium tracking-tight">{section.label}</h2>
                   <p className="text-sm text-muted-foreground">
                     {domains.length} domains · {domains.reduce((n, d) => n + d.skills.length, 0)} skills
                   </p>
@@ -97,7 +97,7 @@ export default function LearnPage() {
         <Reveal index={3}>
           <section className="flex flex-col gap-4">
             <div className="flex items-center justify-between gap-4">
-              <h2 className="font-serif text-xl tracking-tight">Featured resources</h2>
+              <h2 className="text-xl font-medium tracking-tight">Featured resources</h2>
               <Button variant="ghost" size="sm" render={<Link href="/learn/resources" />} nativeButton={false}>
                 <StackIcon data-icon="inline-start" />
                 Browse all

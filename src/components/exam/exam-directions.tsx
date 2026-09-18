@@ -27,7 +27,7 @@ export function ExamDirections({
         <span className="text-xs tracking-[0.05em] text-muted-foreground uppercase">
           {SECTION_LABEL[sectionCode]} — Module {moduleIndex}
         </span>
-        <h1 className="font-serif text-3xl tracking-tight">Directions</h1>
+        <h1 className="text-3xl font-medium tracking-tight">Directions</h1>
       </div>
       <Card className="w-full">
         <CardHeader>

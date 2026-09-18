@@ -35,7 +35,7 @@ export function ExamReviewPage({
         <span className="text-xs tracking-[0.05em] text-muted-foreground uppercase">
           {sectionCode === "RW" ? "Reading and Writing" : "Math"} — Module {moduleIndex}
         </span>
-        <h1 className="font-serif text-3xl tracking-tight">Review your answers</h1>
+        <h1 className="text-3xl font-medium tracking-tight">Review your answers</h1>
         <p className="text-sm text-muted-foreground">
           {answeredCount} of {items.length} answered. Once you submit, you cannot return to this module.
         </p>

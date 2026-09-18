@@ -55,7 +55,7 @@ export default async function GuidePage({ params }: PageProps<"/learn/guides/[id
             <span className="text-xs tracking-[0.05em] text-muted-foreground uppercase">
               {GUIDE_KIND_LABEL[guide.kind]}
             </span>
-            <h1 className="font-serif text-4xl leading-[1.1] tracking-tight">{guide.title}</h1>
+            <h1 className="text-4xl font-medium leading-[1.1] tracking-tight">{guide.title}</h1>
             <p className="text-base leading-relaxed text-muted-foreground">{guide.summary}</p>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
@@ -84,7 +84,7 @@ export default async function GuidePage({ params }: PageProps<"/learn/guides/[id
           <>
             <Separator />
             <section className="flex flex-col gap-3">
-              <h2 className="font-serif text-xl tracking-tight">Skills this covers</h2>
+              <h2 className="text-xl font-medium tracking-tight">Skills this covers</h2>
               <p className="text-sm text-muted-foreground">
                 The same skill names the practice tool reports on your results screen.
               </p>
@@ -103,7 +103,7 @@ export default async function GuidePage({ params }: PageProps<"/learn/guides/[id
           <>
             <Separator />
             <section className="flex flex-col gap-4">
-              <h2 className="font-serif text-xl tracking-tight">Go deeper</h2>
+              <h2 className="text-xl font-medium tracking-tight">Go deeper</h2>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {related.map((resource) => (
                   <ResourceCard key={resource.id} resource={resource} />

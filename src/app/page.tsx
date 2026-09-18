@@ -41,7 +41,7 @@ export default async function HomePage() {
       <div className="isolate flex min-h-screen flex-col items-center justify-center gap-8 px-6">
         <div aria-hidden className="ambient-glow pointer-events-none fixed inset-0 -z-10" />
         <div className="flex flex-col items-center gap-2 text-center">
-          <h1 className="font-serif text-4xl tracking-tight">Getgud</h1>
+          <h1 className="text-4xl font-medium tracking-tight">Getgud</h1>
           <p className="max-w-sm text-sm text-muted-foreground">
             A focused SAT & PSAT practice tool, running locally on your own machine.
           </p>
@@ -92,7 +92,7 @@ export default async function HomePage() {
 
         <header className="flex flex-col gap-1">
           <span className="text-xs tracking-[0.05em] text-muted-foreground uppercase">Getgud</span>
-          <h1 className="font-serif text-4xl tracking-tight">Welcome back, {profile.name}</h1>
+          <h1 className="text-4xl font-medium tracking-tight">Welcome back, {profile.name}</h1>
         </header>
 
         {(inProgressExamSet || inProgress) && (
@@ -144,7 +144,7 @@ export default async function HomePage() {
                   <span className="flex size-8 items-center justify-center rounded-lg border border-border">
                     <GraduationCapIcon className="size-4" />
                   </span>
-                  <CardTitle className="mt-3 font-serif text-2xl tracking-tight">Learn</CardTitle>
+                  <CardTitle className="mt-3 text-2xl font-medium tracking-tight">Learn</CardTitle>
                   <CardDescription className="leading-relaxed">
                     Guides, cheat sheets, and vetted resources — what to study and where to study it.
                   </CardDescription>
@@ -164,7 +164,7 @@ export default async function HomePage() {
                   <span className="flex size-8 items-center justify-center rounded-lg border border-border">
                     <ExamIcon className="size-4" />
                   </span>
-                  <CardTitle className="mt-3 font-serif text-2xl tracking-tight">Practice</CardTitle>
+                  <CardTitle className="mt-3 text-2xl font-medium tracking-tight">Practice</CardTitle>
                   <CardDescription className="leading-relaxed">
                     Targeted drill sets from the official question bank, and full-length adaptive practice tests.
                   </CardDescription>
@@ -183,7 +183,7 @@ export default async function HomePage() {
         <Reveal index={3}>
           <section className="flex flex-col gap-4">
             <div className="flex items-center justify-between gap-4">
-              <h2 className="font-serif text-xl tracking-tight">Study next</h2>
+              <h2 className="text-xl font-medium tracking-tight">Study next</h2>
               <Button variant="ghost" size="sm" render={<Link href="/learn/guides" />} nativeButton={false}>
                 <LightbulbIcon data-icon="inline-start" />
                 All guides
@@ -200,7 +200,7 @@ export default async function HomePage() {
         <Reveal index={4}>
           <section className="flex flex-col gap-4">
             <div className="flex items-center justify-between gap-4">
-              <h2 className="font-serif text-xl tracking-tight">Practice tests</h2>
+              <h2 className="text-xl font-medium tracking-tight">Practice tests</h2>
               <Button variant="ghost" size="sm" render={<Link href="/tests" />} nativeButton={false}>
                 <ExamIcon data-icon="inline-start" />
                 View all
@@ -235,7 +235,7 @@ export default async function HomePage() {
         <Reveal index={5}>
           <section className="flex flex-col gap-4">
             <div className="flex items-center justify-between gap-4">
-              <h2 className="font-serif text-xl tracking-tight">Recent sets</h2>
+              <h2 className="text-xl font-medium tracking-tight">Recent sets</h2>
               <div className="flex items-center gap-1">
                 <Button variant="ghost" size="sm" render={<Link href="/new" />} nativeButton={false}>
                   <PlusIcon data-icon="inline-start" />

@@ -55,7 +55,7 @@ export default async function TopicPage({ params }: PageProps<"/learn/topics/[do
           </Button>
           <div className="flex flex-col gap-3">
             <span className="text-xs tracking-[0.05em] text-muted-foreground uppercase">{sectionLabel}</span>
-            <h1 className="font-serif text-4xl tracking-tight">{domain.label}</h1>
+            <h1 className="text-4xl font-medium tracking-tight">{domain.label}</h1>
             <p className="max-w-xl text-sm leading-relaxed text-muted-foreground">
               {domain.skills.length} skills the test reports separately. Practice questions in this app carry these
               same codes, so your results screen points back here.
@@ -70,7 +70,7 @@ export default async function TopicPage({ params }: PageProps<"/learn/topics/[do
         {guides.length > 0 && (
           <Reveal index={0}>
             <section className="flex flex-col gap-4">
-              <h2 className="font-serif text-xl tracking-tight">Guides</h2>
+              <h2 className="text-xl font-medium tracking-tight">Guides</h2>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {guides.map((guide) => (
                   <GuideCard key={guide.id} guide={guide} />
@@ -82,7 +82,7 @@ export default async function TopicPage({ params }: PageProps<"/learn/topics/[do
 
         <Reveal index={1}>
           <section className="flex flex-col gap-4">
-            <h2 className="font-serif text-xl tracking-tight">Skills</h2>
+            <h2 className="text-xl font-medium tracking-tight">Skills</h2>
             <div className="flex flex-col gap-3">
               {domain.skills.map((skill) => {
                 const forSkill = studyForSkill(skill.code, domain.code);
@@ -130,7 +130,7 @@ export default async function TopicPage({ params }: PageProps<"/learn/topics/[do
             <Reveal index={2}>
               <section className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1">
-                  <h2 className="font-serif text-xl tracking-tight">Resources</h2>
+                  <h2 className="text-xl font-medium tracking-tight">Resources</h2>
                   <p className="text-sm text-muted-foreground">
                     Tagged to {domainLabel(domain.code)}. For the full shelf, see{" "}
                     <Link href="/learn/resources" className="underline underline-offset-4 hover:text-foreground">
