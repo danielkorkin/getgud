@@ -74,7 +74,7 @@ function SiteNav() {
     <nav aria-label="Main" className="border-b border-border/60">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-0 px-6">
         <div className="flex h-14 items-center justify-between gap-4">
-          <Link href="/" className="font-serif text-lg tracking-tight transition-opacity hover:opacity-70">
+          <Link href="/" className="text-lg font-medium tracking-tight transition-opacity hover:opacity-70">
             Getgud
           </Link>
 

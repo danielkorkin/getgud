@@ -74,7 +74,7 @@ export default async function ResultsPage({ params }: PageProps<"/sets/[id]/resu
           <ArrowLeftIcon data-icon="inline-start" />
           Back to library
         </Button>
-        <h1 className="font-serif text-4xl tracking-tight">{set.name}</h1>
+        <h1 className="text-4xl font-medium tracking-tight">{set.name}</h1>
         <p className="text-sm text-muted-foreground">
           {set.assessment} · {set.questionCount} questions
         </p>
@@ -91,7 +91,7 @@ export default async function ResultsPage({ params }: PageProps<"/sets/[id]/resu
       {skillRows.length > 0 && (
         <section className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
-            <h2 className="font-serif text-xl tracking-tight">By skill</h2>
+            <h2 className="text-xl font-medium tracking-tight">By skill</h2>
             <p className="text-sm text-muted-foreground">Weakest first. Each one links to its study guides.</p>
           </div>
           <div className="flex flex-col gap-1.5">
@@ -115,7 +115,7 @@ export default async function ResultsPage({ params }: PageProps<"/sets/[id]/resu
       )}
 
       <section className="flex flex-col gap-3">
-        <h2 className="font-serif text-xl tracking-tight">Question review</h2>
+        <h2 className="text-xl font-medium tracking-tight">Question review</h2>
         <div className="flex flex-col gap-1.5">
           {items.map((item) => {
             const attempt = attemptByItemId.get(item.id);

@@ -29,7 +29,7 @@ export default function GuidesPage() {
 
         <header className="flex flex-col gap-3">
           <span className="text-xs tracking-[0.05em] text-muted-foreground uppercase">Learn</span>
-          <h1 className="font-serif text-4xl tracking-tight">Guides</h1>
+          <h1 className="text-4xl font-medium tracking-tight">Guides</h1>
           <p className="max-w-xl text-sm leading-relaxed text-muted-foreground">
             {GUIDES.length} guides, {totalMinutes} minutes of reading in total. Written for this app rather than
             linked from elsewhere, so they work offline and stay consistent with how the practice tool scores and
@@ -40,7 +40,7 @@ export default function GuidesPage() {
         {wholeTest.length > 0 && (
           <Reveal index={0}>
             <section className="flex flex-col gap-4">
-              <h2 className="font-serif text-xl tracking-tight">The whole test</h2>
+              <h2 className="text-xl font-medium tracking-tight">The whole test</h2>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {wholeTest.map((guide) => (
                   <GuideCard key={guide.id} guide={guide} />
@@ -56,7 +56,7 @@ export default function GuidesPage() {
           return (
             <Reveal key={section.code} index={i + 1}>
               <section className="flex flex-col gap-4">
-                <h2 className="font-serif text-xl tracking-tight">{section.label}</h2>
+                <h2 className="text-xl font-medium tracking-tight">{section.label}</h2>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {guides.map((guide) => (
                     <GuideCard key={guide.id} guide={guide} />

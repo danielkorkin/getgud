@@ -169,7 +169,7 @@ function ResourceDirectory({ resources }: { resources: readonly Resource[] }) {
       ) : (
         grouped.map((group) => (
           <section key={group.kind} className="flex flex-col gap-4">
-            <h2 className="font-serif text-xl tracking-tight">{KIND_LABEL[group.kind]}</h2>
+            <h2 className="text-xl font-medium tracking-tight">{KIND_LABEL[group.kind]}</h2>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {group.items.map((resource) => (
                 <ResourceCard key={resource.id} resource={resource} />

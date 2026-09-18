@@ -142,7 +142,7 @@ function GuideBody({ sections }: { sections: readonly GuideSection[] }) {
     <div className="flex flex-col gap-12">
       {sections.map((section) => (
         <section key={section.heading} className="flex flex-col gap-4">
-          <h2 className="font-serif text-2xl tracking-tight">{section.heading}</h2>
+          <h2 className="text-2xl font-medium tracking-tight">{section.heading}</h2>
           {section.blocks.map((block, i) => (
             <Block key={i} block={block} />
           ))}

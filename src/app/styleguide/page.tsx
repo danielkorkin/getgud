@@ -52,7 +52,7 @@ function Section({
   return (
     <section className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <h2 className="font-serif text-2xl tracking-tight">{title}</h2>
+        <h2 className="text-2xl font-medium tracking-tight">{title}</h2>
         {description ? (
           <p className="text-sm text-muted-foreground">{description}</p>
         ) : null}
@@ -74,7 +74,7 @@ export default function StyleguidePage() {
           <span className="text-xs tracking-[0.05em] text-muted-foreground uppercase">
             Getgud — Design Language
           </span>
-          <h1 className="font-serif text-5xl leading-[1.1] tracking-tight">
+          <h1 className="text-5xl font-medium leading-[1.1] tracking-tight">
             Quiet, editorial, built for focus.
           </h1>
           <p className="max-w-xl text-base text-muted-foreground">
@@ -100,7 +100,7 @@ export default function StyleguidePage() {
                   <span className="text-xs tracking-wide text-muted-foreground uppercase">
                     {cell.label}
                   </span>
-                  <span className="font-serif text-2xl leading-[1.1] tracking-tight">
+                  <span className="text-2xl font-medium leading-[1.1] tracking-tight">
                     {cell.value}
                   </span>
                 </div>
@@ -132,15 +132,15 @@ export default function StyleguidePage() {
           <div className="flex flex-col gap-6">
             <div>
               <p className="text-xs text-muted-foreground">
-                Heading — Instrument Serif
+                Heading — Geist Sans, medium
               </p>
-              <p className="font-serif text-4xl leading-[1.1] tracking-tight">
+              <p className="text-4xl font-medium leading-[1.1] tracking-tight">
                 Question 12 of 27
               </p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">
-                Body — Geist Sans
+                Body — Geist Sans, regular
               </p>
               <p className="max-w-lg text-base">
                 Which choice completes the text with the most logical

@@ -40,7 +40,7 @@ export default async function TestsPage() {
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-6 py-16">
       <header className="flex flex-col gap-1">
         <span className="text-xs tracking-[0.05em] text-muted-foreground uppercase">Formal practice</span>
-        <h1 className="font-serif text-4xl tracking-tight">Practice tests</h1>
+        <h1 className="text-4xl font-medium tracking-tight">Practice tests</h1>
         <p className="text-sm text-muted-foreground">
           Full-length, timed, adaptive — the same test on every self-hosted copy of Getgud.
         </p>
