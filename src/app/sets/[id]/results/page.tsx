@@ -14,6 +14,7 @@ import {
   ArrowLeftIcon,
   LightbulbIcon,
   EyeIcon,
+  GraduationCapIcon,
 } from "@phosphor-icons/react/dist/ssr";
 
 const DIFFICULTY_VARIANT = { E: "tag-green", M: "tag-yellow", H: "tag-red" } as const;
@@ -46,15 +47,25 @@ export default async function ResultsPage({ params }: PageProps<"/sets/[id]/resu
   const revealedCount = attempts.filter((a) => a.answerRevealed).length;
   const avgActiveMs = attempts.length > 0 ? Math.round(set.totalActiveMs / attempts.length) : 0;
 
-  const bySkill = new Map<string, { correct: number; graded: number }>();
+  // Carries domainCode alongside the counts because the Learn link needs
+  // it — /learn/topics/[domain] is keyed by domain, with the skill as a
+  // fragment. Deriving it here avoids a second lookup in the render.
+  const bySkill = new Map<string, { correct: number; graded: number; domainCode: string }>();
   for (const item of items) {
     const attempt = attemptByItemId.get(item.id);
     if (!attempt || attempt.status !== "answered" || !attempt.gradable) continue;
-    const entry = bySkill.get(item.skillCode) ?? { correct: 0, graded: 0 };
+    const entry = bySkill.get(item.skillCode) ?? { correct: 0, graded: 0, domainCode: item.domainCode };
     entry.graded += 1;
     if (attempt.isCorrect) entry.correct += 1;
     bySkill.set(item.skillCode, entry);
   }
+
+  // Weakest first. The point of this section is deciding what to study
+  // next, and insertion order (i.e. the order questions happened to appear
+  // in the set) carries no information about that.
+  const skillRows = [...bySkill.entries()]
+    .map(([skillCode, stats]) => ({ skillCode, ...stats, rate: stats.correct / stats.graded }))
+    .sort((a, b) => a.rate - b.rate || b.graded - a.graded);
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-6 py-16">
@@ -63,7 +74,7 @@ export default async function ResultsPage({ params }: PageProps<"/sets/[id]/resu
           <ArrowLeftIcon data-icon="inline-start" />
           Back to library
         </Button>
-        <h1 className="font-serif text-4xl tracking-tight">{set.name}</h1>
+        <h1 className="text-4xl font-medium tracking-tight">{set.name}</h1>
         <p className="text-sm text-muted-foreground">
           {set.assessment} · {set.questionCount} questions
         </p>
@@ -77,24 +88,34 @@ export default async function ResultsPage({ params }: PageProps<"/sets/[id]/resu
         <StatCard label="Revealed" value={String(revealedCount)} />
       </div>
 
-      {bySkill.size > 0 && (
+      {skillRows.length > 0 && (
         <section className="flex flex-col gap-3">
-          <h2 className="font-serif text-xl tracking-tight">By skill</h2>
+          <div className="flex flex-col gap-1">
+            <h2 className="text-xl font-medium tracking-tight">By skill</h2>
+            <p className="text-sm text-muted-foreground">Weakest first. Each one links to its study guides.</p>
+          </div>
           <div className="flex flex-col gap-1.5">
-            {[...bySkill.entries()].map(([skillCode, { correct, graded }]) => (
-              <div key={skillCode} className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2 text-sm">
+            {skillRows.map(({ skillCode, correct, graded, domainCode }) => (
+              <Link
+                key={skillCode}
+                href={`/learn/topics/${domainCode}#skill-${skillCode}`}
+                className="group flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2 text-sm transition-colors hover:bg-muted/50"
+              >
                 <span>{skillLabel(skillCode)}</span>
-                <span className="font-mono text-muted-foreground">
-                  {correct}/{graded}
+                <span className="flex items-center gap-2">
+                  <span className="font-mono text-muted-foreground">
+                    {correct}/{graded}
+                  </span>
+                  <GraduationCapIcon className="size-4 shrink-0 text-muted-foreground transition-opacity opacity-0 group-hover:opacity-100" />
                 </span>
-              </div>
+              </Link>
             ))}
           </div>
         </section>
       )}
 
       <section className="flex flex-col gap-3">
-        <h2 className="font-serif text-xl tracking-tight">Question review</h2>
+        <h2 className="text-xl font-medium tracking-tight">Question review</h2>
         <div className="flex flex-col gap-1.5">
           {items.map((item) => {
             const attempt = attemptByItemId.get(item.id);

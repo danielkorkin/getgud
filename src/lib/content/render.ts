@@ -151,3 +151,23 @@ export function renderContentField({ html, contentHash, field }: RenderContentFi
   cacheSet(key, sanitized);
   return sanitized;
 }
+
+/**
+ * Render one author-written LaTeX string (a formula in a Learn guide — see
+ * src/resources/spec.ts's `formulas` block) to KaTeX HTML.
+ *
+ * Exists so the Learn section's math goes through exactly the same KaTeX +
+ * `applyLatexHygiene` path as question content, rather than standing up a
+ * second renderer that could drift from it typographically.
+ *
+ * Unlike `renderContentField` this takes LaTeX directly — there's no
+ * MathML, no College Board markup, and nothing to sanitize beyond what
+ * KaTeX emits, because the input is committed source in this repo rather
+ * than scraped content. It is deliberately NOT safe to call on untrusted
+ * input: there is no DOMPurify pass here. `name` is used as the accessible
+ * label, which is the closest thing a hand-authored formula has to
+ * College Board's spoken-math alt text.
+ */
+export function renderGuideLatex(latex: string, name: string): string {
+  return renderLatex(latex, name);
+}

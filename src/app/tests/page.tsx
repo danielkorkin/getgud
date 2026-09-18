@@ -8,7 +8,8 @@ import { startExam } from "@/actions/exams";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ClockIcon, WarningCircleIcon, BooksIcon, HouseIcon } from "@phosphor-icons/react/dist/ssr";
+import { SiteNav } from "@/components/site-nav";
+import { ClockIcon, WarningCircleIcon } from "@phosphor-icons/react/dist/ssr";
 
 export default async function TestsPage() {
   const profile = await getCurrentProfile();
@@ -34,25 +35,15 @@ export default async function TestsPage() {
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-6 py-16">
-      <header className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <span className="text-xs tracking-[0.05em] text-muted-foreground uppercase">Formal practice</span>
-          <h1 className="font-serif text-4xl tracking-tight">Practice tests</h1>
-          <p className="text-sm text-muted-foreground">
-            Full-length, timed, adaptive — the same test on every self-hosted copy of Getgud.
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <Button variant="ghost" size="sm" render={<Link href="/sets" />} nativeButton={false}>
-            <BooksIcon data-icon="inline-start" />
-            Practice sets
-          </Button>
-          <Button variant="ghost" size="sm" render={<Link href="/" />} nativeButton={false}>
-            <HouseIcon data-icon="inline-start" />
-            Home
-          </Button>
-        </div>
+    <>
+      <SiteNav />
+      <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-6 py-16">
+      <header className="flex flex-col gap-1">
+        <span className="text-xs tracking-[0.05em] text-muted-foreground uppercase">Formal practice</span>
+        <h1 className="text-4xl font-medium tracking-tight">Practice tests</h1>
+        <p className="text-sm text-muted-foreground">
+          Full-length, timed, adaptive — the same test on every self-hosted copy of Getgud.
+        </p>
       </header>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -117,6 +108,7 @@ export default async function TestsPage() {
           );
         })}
       </div>
-    </div>
+      </div>
+    </>
   );
 }
