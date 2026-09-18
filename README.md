@@ -22,9 +22,23 @@ password), and telemetry capture for a future stats screen. Alongside that,
 `/tests` offers full-length, timed, adaptive SAT practice tests — the same
 committed set of questions on every self-hosted copy of Getgud, with
 module-scoped timers, routing into an easier or harder second module based
-on first-module performance, and a scaled score out of 1600 at the end. See
-[CLAUDE.md](./CLAUDE.md) for the full architecture and load-bearing
-implementation notes.
+on first-module performance, and a scaled score out of 1600 at the end.
+
+The app is divided into two halves. **Practice** is everything above.
+**Learn** (`/learn`) is a study library: original cheat sheets and strategy
+guides written for this repo — math formulas split by what Bluebook gives
+you versus what you have to memorize, every grammar rule the test actually
+tests, a Desmos playbook, reading and question-type strategy, statistics,
+pacing, and study plans — alongside a hand-checked shelf of external
+resources (College Board's own material, Khan Academy's official free
+course, schoolhouse.world's free live tutoring, the best YouTube channels,
+Desmos, books, and communities). Every external link was verified by
+fetching it and carries the date it was checked. Guides and resources are
+tagged with the same domain/skill codes as the questions, so the results
+screen links a missed skill straight to the material for it. The Learn half
+needs no database and no profile — it works on a fresh clone, before the
+scrape has run. See [CLAUDE.md](./CLAUDE.md) for the full architecture and
+load-bearing implementation notes.
 
 ## From-scratch setup
 

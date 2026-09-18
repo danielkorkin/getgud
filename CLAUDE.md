@@ -455,6 +455,75 @@ repeat. Follow it in order — each step depends on the last:
    `RESERVED_QUESTION_IDS` picked up the new exam without you touching
    `generate-set.ts`.
 
+## Learn section (resources + guides)
+
+The site is split into two halves: **Practice** (`/new`, `/sets`, `/tests`
+— everything above) and **Learn** (`/learn`), a curated study library.
+`/` is the shared entry point and presents both.
+
+**The shelf is committed code, not database rows** (`src/resources/`) —
+same decision, same reasoning, as `src/exams/`: it's identical on every
+self-hosted copy, it needs no contract change or migration to edit, it's
+reviewable in a diff, and critically **it renders on a fresh clone before
+`pnpm scrape` has ever run.** That last point is why `/learn` requires
+neither a profile nor a database: until the pipeline completes the entire
+Practice half is empty, and a new user needs somewhere to go.
+
+Layout mirrors `src/exams/` deliberately:
+- `src/resources/spec.ts` — types + pure validation, dependency-free.
+- `src/resources/index.ts` — the registry, with load-time assertions.
+- `official.ts` / `courses.ts` / `channels.ts` / `library.ts` — external links.
+- `src/resources/guides/*.ts` — original in-app content (cheat sheets,
+  strategy, study plans), authored here rather than linked.
+
+**Every external URL is verified by fetching it, and carries a
+`verifiedAt` date.** Four plausible-looking College Board paths and one
+guessed YouTube `@handle` turned out to be 404s during the initial
+curation pass — a remembered URL shape is not evidence. When adding a
+resource, fetch it first. Link rot is the main way this shelf decays, so
+the date is there to tell a future maintainer how stale a check is.
+
+**Resources and guides are tagged with the same `domainCode`/`skillCode`
+taxonomy as questions** (`src/lib/catalog.ts`), which is what lets the
+practice results page link a missed skill straight to its study material
+(`studyForSkill` in the registry, ordered most-specific-first). Those codes
+are validated against the catalog at module load, because a typo'd skill
+code doesn't throw — it silently never matches, so a student's weakest
+skill would quietly show no resources. Same class of silent failure the
+exam registry's assertions exist to catch. The registry also rejects
+duplicate ids, duplicate URLs, and a `related` id pointing at a resource
+that no longer exists.
+
+**Two React Server Component hazards this section hit, both worth knowing
+before editing it:**
+
+1. `ResourceCard`/`GuideCard` are `"use client"` **on purpose.** They're
+   rendered from server pages *and* from the client-filtered directory, and
+   `@phosphor-icons/react`'s bare import crashes a Server Component build
+   (see the icon note above). Importing from `/dist/ssr` instead would
+   break the moment the client directory imports the same file. Marking the
+   leaf as a client component is the only option correct from both sides.
+2. **Constants can't live in those client files.** Next turns *every*
+   export of a `"use client"` module into a client reference, so a Server
+   Component reading a plain constant from one throws at runtime rather
+   than rendering. The label maps therefore live in
+   `src/components/learn/labels.ts`, a plain module with no `"use client"`,
+   imported by both sides.
+
+Everything a client component imports from `@/resources` is a **type-only**
+import, which keeps the registry (and its load-time validation) out of the
+client bundle. `/learn/resources` gets the data as a serialized prop
+instead. If you add a value import there, the whole shelf ships to the
+browser.
+
+`SiteNav` (`src/components/site-nav.tsx`) is the shared nav that makes the
+two halves navigable, and it replaced the hand-written cross-links each
+page used to carry — adding a route to its `SECTIONS` map now surfaces it
+everywhere at once, rather than needing a link added to every page by hand.
+It is deliberately **not** rendered by the runners (`/sets/[id]`,
+`/tests/[sessionId]`): those are focused test-taking surfaces, and in exam
+mode the UI must not offer navigation out of a timed module.
+
 ## Repo layout notes
 
 - `.agents/skills/`, `.claude/skills/`, `.cursor/skills/`, `.devin/skills/`

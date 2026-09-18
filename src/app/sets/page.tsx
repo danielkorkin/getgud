@@ -5,7 +5,8 @@ import { getCurrentProfile } from "@/lib/profile";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { PlusIcon, ExamIcon } from "@phosphor-icons/react/dist/ssr";
+import { SiteNav } from "@/components/site-nav";
+import { PlusIcon } from "@phosphor-icons/react/dist/ssr";
 
 const STATUS_LABEL: Record<string, string> = {
   in_progress: "In progress",
@@ -29,22 +30,18 @@ export default async function SetsLibraryPage() {
     .all();
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-6 py-16">
+    <>
+      <SiteNav />
+      <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-6 py-16">
       <header className="flex items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
           <span className="text-xs tracking-[0.05em] text-muted-foreground uppercase">Library</span>
           <h1 className="font-serif text-4xl tracking-tight">Your practice sets</h1>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" render={<Link href="/tests" />} nativeButton={false}>
-            <ExamIcon data-icon="inline-start" />
-            Practice tests
-          </Button>
-          <Button render={<Link href="/new" />} nativeButton={false}>
-            <PlusIcon data-icon="inline-start" />
-            New set
-          </Button>
-        </div>
+        <Button render={<Link href="/new" />} nativeButton={false}>
+          <PlusIcon data-icon="inline-start" />
+          New set
+        </Button>
       </header>
 
       {sets.length === 0 ? (
@@ -75,6 +72,7 @@ export default async function SetsLibraryPage() {
           })}
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }
