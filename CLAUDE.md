@@ -60,6 +60,7 @@ pnpm scrape          # network -> data/raw/{list,question,ibn}/ (resumable)
 pnpm convert:math    # data/raw/ibn -> data/raw/vision/latex-cache.json (code only, no network/AI)
 pnpm load            # data/raw/** -> Postgres (no network; safe to re-run any time)
 pnpm db:verify       # sanity-check the loaded database
+pnpm db:reset-users  # wipe every profile + practice/exam history; keeps the question bank and hint cache — dry-run by default, pass --yes to execute
 
 # Premade exam blueprints — see "Premade exams" below
 pnpm design:exam --exam=<id> --seed=<s>   # deterministic, read-only question selection; prints a paste-ready id list

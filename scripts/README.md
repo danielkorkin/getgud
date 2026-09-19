@@ -23,6 +23,15 @@ only re-run `pnpm convert:math` after editing
 `data/raw/vision/manual-overrides.json` or improving
 `scripts/lib/spoken-math.ts`.
 
+## Resetting user data without re-running the pipeline
+
+`pnpm db:reset-users` (`scripts/reset-user-data.ts`) is unrelated to the
+pipeline above — it wipes every `profile` row and, via cascading foreign
+keys, everything that hangs off one (`practice_set`, `attempt`,
+`exam_session`, etc.), while leaving `question`/`question_assessment` (this
+pipeline's output) and `question_hint` (the AI hint cache, shared across
+profiles) untouched. Dry-run by default; pass `--yes` to actually execute.
+
 See `ATTRIBUTION.md` for what each stage does and why.
 
 `scripts/design-exam.ts` is a separate, downstream tool — it reads the
