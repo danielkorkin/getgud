@@ -1,7 +1,9 @@
 import "server-only";
 
-import { param } from "@prisma/orm-postgres/relational-core";
-import { db } from "@/prisma/db";
+// `param` must come from `@/prisma/db`, not `@prisma/orm-postgres/relational-core`
+// directly — see the comment in db.ts for why importing it straight from the
+// package can hand `db.raw.sql` a `ParamRef` from a different Turbopack bundle.
+import { db, param } from "@/prisma/db";
 import { RESERVED_QUESTION_IDS } from "@/exams";
 import {
   DIFFICULTIES,

@@ -1,8 +1,10 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { param } from "@prisma/orm-postgres/relational-core";
-import { db } from "@/prisma/db";
+// `param` must come from `@/prisma/db`, not `@prisma/orm-postgres/relational-core`
+// directly — see the comment in db.ts for why importing it straight from the
+// package can hand `db.raw.sql` a `ParamRef` from a different Turbopack bundle.
+import { db, param } from "@/prisma/db";
 import { requireProfileId } from "@/lib/profile";
 import { getOwnedItem } from "@/lib/access";
 import { renderContentField } from "@/lib/content/render";

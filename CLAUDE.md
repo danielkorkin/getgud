@@ -221,19 +221,35 @@ re-derive ownership itself** — `src/lib/access.ts`'s `getOwnedItem()` (or
 `src/lib/profile.ts`'s `requireProfileId()`) does this; never trust a bare id
 from the client. "No password" profiles are still not "no authorization."
 
-**`db.raw.sql` + `param(...)` from `@prisma/orm-postgres/relational-core`
-does not work when called from code reachable through a Route Handler
-(`app/api/*/route.ts`) under Turbopack dev** — it throws
-`RUNTIME.RAW_SQL_UNSUPPORTED_INTERPOLATION` even for a query that works
-byte-for-byte from a Server Action or a plain script (Route Handlers and
-Server Actions land in different Turbopack dev bundles, and the ParamRef
-only satisfies the interpolation check within the bundle that produced it).
-Moving the raw-SQL call into its own module doesn't help — it's keyed by
-the request's entrypoint, not which file the code lives in. Fix: use the
-ORM (`db.orm.public.<Model>.create(...)`) from anything invoked via a route
-handler, not `db.raw.sql`/`param()`. See `src/lib/ingest-events.ts`'s file
-comment. (`generate-set.ts`'s `param()` usage is fine — everything there
-runs through Server Actions.)
+**Always import `param` from `@/prisma/db`, never straight from
+`@prisma/orm-postgres/relational-core`** — the latter intermittently throws
+`RUNTIME.RAW_SQL_UNSUPPORTED_INTERPOLATION` ("wrap this value in `param(...)`
+with an explicit codec") on a value that already went through `param(...)`.
+Cause: `db.ts` caches the postgres client on `globalThis` so Turbopack-dev
+HMR reuses one `pg.Pool` (see its file comment) — but Turbopack bundles each
+route/action entrypoint separately, so whichever entrypoint evaluates
+`db.ts` *first* after a restart is the one whose `@prisma/orm-postgres`
+module instance builds `db`, and `db.raw.sql`'s interpolation check does
+`value instanceof ParamRef` against *that* instance's `ParamRef` class.
+Every other entrypoint gets the cached `db` back from `globalThis`, but if
+it imports `param` from the package directly it gets its *own* bundle's
+`ParamRef` class — same npm package, different class identity, so the
+`instanceof` check fails on every array/list param even though the value
+is unmistakably a `ParamRef`. This is order-dependent (whichever route or
+action happens to load first after a restart "wins"), which is why it can
+look like it only affects route handlers, or only Server Actions, on a
+given run — it's neither; it affects any caller whose `param` didn't come
+from the cached instance. Fix (already applied in `db.ts`): cache `param`
+in the same `globalThis` slot as `db` and re-export it, so every bundle
+gets back the exact `param` bound to whichever `db` actually got cached.
+`src/lib/query/generate-set.ts` and `src/actions/exams.ts` import
+`{ db, param }` from `@/prisma/db` for this reason — don't reintroduce a
+direct `@prisma/orm-postgres/relational-core` import for `param` anywhere.
+(`src/lib/ingest-events.ts` sidesteps the whole class of bug by using the
+ORM instead of raw SQL — see its file comment — which is still the right
+call there, but isn't required elsewhere now that `param` is pinned.)
+Restart `pnpm dev` after pulling a change to `db.ts`'s cache shape — HMR
+reusing an old-shaped cached object here breaks `db` until a full restart.
 
 **Base UI's `ToggleGroup` defaults to `multiple={false}` (single-select)** —
 unlike Radix's `type="multiple"` convention. Forgetting `multiple` on a
