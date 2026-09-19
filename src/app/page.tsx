@@ -25,6 +25,7 @@ import { Reveal } from "@/components/reveal";
 import {
   PlusIcon,
   BooksIcon,
+  ChartLineIcon,
   ExamIcon,
   GraduationCapIcon,
   LightbulbIcon,
@@ -181,6 +182,24 @@ export default async function HomePage() {
         </Reveal>
 
         <Reveal index={3}>
+          <Link href="/stats" className="block">
+            <Card interactive>
+              <CardHeader>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-col gap-1">
+                    <CardTitle className="text-base">Your stats</CardTitle>
+                    <CardDescription>
+                      Trends, weak skills, and AI-generated practice recommendations.
+                    </CardDescription>
+                  </div>
+                  <ChartLineIcon className="size-5 shrink-0 text-muted-foreground" />
+                </div>
+              </CardHeader>
+            </Card>
+          </Link>
+        </Reveal>
+
+        <Reveal index={4}>
           <section className="flex flex-col gap-4">
             <div className="flex items-center justify-between gap-4">
               <h2 className="text-xl font-medium tracking-tight">Study next</h2>
@@ -197,7 +216,7 @@ export default async function HomePage() {
           </section>
         </Reveal>
 
-        <Reveal index={4}>
+        <Reveal index={5}>
           <section className="flex flex-col gap-4">
             <div className="flex items-center justify-between gap-4">
               <h2 className="text-xl font-medium tracking-tight">Practice tests</h2>
@@ -232,7 +251,7 @@ export default async function HomePage() {
           </section>
         </Reveal>
 
-        <Reveal index={5}>
+        <Reveal index={6}>
           <section className="flex flex-col gap-4">
             <div className="flex items-center justify-between gap-4">
               <h2 className="text-xl font-medium tracking-tight">Recent sets</h2>
@@ -281,7 +300,7 @@ export default async function HomePage() {
           </section>
         </Reveal>
 
-        <Reveal index={6}>
+        <Reveal index={7}>
           <Link href="/learn/resources" className="block">
             <Card interactive>
               <CardHeader>

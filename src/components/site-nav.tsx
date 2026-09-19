@@ -1,7 +1,7 @@
 "use client";
 
-// The shared top-level navigation, and the thing that makes the two-half
-// split ("Learn" vs "Practice") legible from every page.
+// The shared top-level navigation, and the thing that makes the app's
+// sections ("Learn", "Practice", "Stats") legible from every page.
 //
 // Why this exists at all: until now every page rendered its own inline
 // <header> with hand-written cross-links, which meant a new top-level
@@ -25,9 +25,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "cn";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { BooksIcon, ExamIcon, GraduationCapIcon, LightbulbIcon, PlusIcon, StackIcon } from "@phosphor-icons/react";
+import { BooksIcon, ChartLineIcon, ExamIcon, GraduationCapIcon, LightbulbIcon, PlusIcon, StackIcon } from "@phosphor-icons/react";
 
-type Half = "learn" | "practice";
+type Half = "learn" | "practice" | "stats";
 
 interface NavLink {
   href: string;
@@ -56,11 +56,18 @@ const SECTIONS: Record<Half, { label: string; href: string; blurb: string; links
       { href: "/tests", label: "Practice tests", icon: ExamIcon },
     ],
   },
+  stats: {
+    label: "Stats",
+    href: "/stats",
+    blurb: "Trends, weak skills, and AI-generated recommendations",
+    links: [{ href: "/stats", label: "Overview", icon: ChartLineIcon }],
+  },
 };
 
-/** Which half a path belongs to. `/` is intentionally neither — home is the shared entry point and presents both halves in its body. */
+/** Which section a path belongs to. `/` is intentionally none of them — home is the shared entry point and presents the sections in its body. */
 function halfForPath(pathname: string): Half | null {
   if (pathname.startsWith("/learn")) return "learn";
+  if (pathname.startsWith("/stats")) return "stats";
   if (pathname === "/new" || pathname.startsWith("/sets") || pathname.startsWith("/tests")) return "practice";
   return null;
 }

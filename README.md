@@ -17,12 +17,12 @@ avatar coach whose eyes track your cursor continuously, who reacts to each
 submission, gives a one-line AI takeaway, and holds a progressive 3-level
 hint ladder (then a confirm-gated answer reveal) and a full post-answer chat
 that's saved per question and restored exactly as you left it — plus a set
-library (`/sets`), a results screen, local cookie-based profiles (no
-password), and telemetry capture for a future stats screen. Alongside that,
-`/tests` offers full-length, timed, adaptive SAT practice tests — the same
-committed set of questions on every self-hosted copy of Getgud, with
-module-scoped timers, routing into an easier or harder second module based
-on first-module performance, and a scaled score out of 1600 at the end.
+library (`/sets`) and a results screen, and local cookie-based profiles (no
+password). Alongside that, `/tests` offers full-length, timed, adaptive SAT
+practice tests — the same committed set of questions on every self-hosted
+copy of Getgud, with module-scoped timers, routing into an easier or harder
+second module based on first-module performance, and a scaled score out of
+1600 at the end.
 
 The app is divided into two halves. **Practice** is everything above.
 **Learn** (`/learn`) is a study library: original cheat sheets and strategy
@@ -39,6 +39,17 @@ screen links a missed skill straight to the material for it. The Learn half
 needs no database and no profile — it works on a fresh clone, before the
 scrape has run. See [CLAUDE.md](./CLAUDE.md) for the full architecture and
 load-bearing implementation notes.
+
+A third header section, **Stats** (`/stats`), rolls every practice set and
+practice test into one dashboard: accuracy trends, skill/domain/difficulty
+breakdowns, time-of-day and tool-usage (calculator, reference sheet,
+marked-for-review) patterns, and exam score history, each paired with
+plain-English insights so the charts come with a takeaway, not just numbers.
+An "Analyze my performance" button sends a summary of all of that — plus a
+read of your past post-answer coach conversations, looking for a
+misunderstanding that keeps recurring — to the AI for a short written
+analysis and 1-3 recommended practice sets, each one clickable straight into
+a real, ready-to-answer set targeting exactly the skills it flagged.
 
 ## From-scratch setup
 
@@ -137,7 +148,8 @@ Both are optional — each feature degrades gracefully (disabled button with an
 explanation) if its key is unset:
 
 - `OPENROUTER_API_KEY` — Strobi's hints, reaction takeaways, and post-answer
-  chat, via [OpenRouter](https://openrouter.ai/keys).
+  chat, plus the Stats page's "Analyze my performance" feature, via
+  [OpenRouter](https://openrouter.ai/keys).
 - `NEXT_PUBLIC_DESMOS_API_KEY` — the runner's calculator, via a free key from
   [desmos.com/api](https://www.desmos.com/api).
 
@@ -164,6 +176,7 @@ restarted.
 - [shadcn/ui](https://ui.shadcn.com) on [Base UI](https://base-ui.com), Tailwind CSS v4
 - [AI SDK](https://ai-sdk.dev) + [`@openrouter/ai-sdk-provider`](https://openrouter.ai) — streaming hints, takeaways, and chat
 - [KaTeX](https://katex.org) — server-side math rendering from MathML/LaTeX
+- [Recharts](https://recharts.org) — the `/stats` page's charts, via shadcn's `chart` wrapper
 - [Desmos API](https://www.desmos.com/api) — in-runner graphing/scientific calculator
 - `@bible-strong/avatar-react` / `avatar-core` (patched, AGPL-3.0-only) — Strobi's
   procedural SVG renderer; see [CLAUDE.md](./CLAUDE.md)'s "Patched avatar packages"

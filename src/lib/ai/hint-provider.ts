@@ -24,3 +24,20 @@ export function getCoachModel() {
   const openrouter = createOpenRouter({ apiKey });
   return openrouter(modelId(), { reasoning: { enabled: false, effort: "none" } });
 }
+
+/**
+ * Structured one-shot analysis over a profile's full practice history
+ * (src/actions/stats.ts). Unlike getCoachModel(), reasoning is left at the
+ * provider default rather than disabled — this is a heavier one-shot
+ * judgment call over an aggregated summary, not a latency-sensitive
+ * per-question tutor reply. The response-healing plugin repairs malformed
+ * structured output before it reaches generateObject's schema validation,
+ * which matters more here than for hints/coach since a bad recommendation
+ * schema would otherwise surface as a hard failure instead of a retry.
+ */
+export function getAnalysisModel() {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) throw new Error("OPENROUTER_API_KEY is not set.");
+  const openrouter = createOpenRouter({ apiKey });
+  return openrouter(modelId(), { plugins: [{ id: "response-healing" }] });
+}

@@ -26,13 +26,17 @@ a progressive 3-level hint ladder (then a confirm-gated answer reveal) and a
 full post-answer chat, all with the model's reasoning turned off; a set
 library (`/sets`) and results screen (`/sets/[id]/results`); local
 cookie-based profiles (no auth); three API routes (`/api/hint` and
-`/api/coach` streaming, `/api/events` telemetry ingest); and a second, formal
+`/api/coach` streaming, `/api/events` telemetry ingest); a second, formal
 practice mode —
 premade, full-length, timed, adaptive SAT practice tests (`/tests`,
 `/tests/[sessionId]`, `/tests/[sessionId]/results`) that are identical on
-every self-hosted instance. See "Practice-tool app layer" below for the
-data model and load-bearing gotchas, and "Premade exams" for the exam
-system specifically.
+every self-hosted instance; and a deep statistics page (`/stats`) that
+aggregates every practice set and practice test into charts, rule-based
+insights, and an on-demand AI analysis that can also mine past coach
+conversations for recurring trouble and generate new targeted practice sets
+in one click. See "Practice-tool app layer" below for the data model and
+load-bearing gotchas, "Premade exams" for the exam system specifically, and
+"Statistics & AI analysis" for `/stats`.
 
 ## Commands
 
@@ -145,6 +149,9 @@ The short version:
 - Tailwind CSS v4, config lives in `src/app/globals.css` (no `tailwind.config.*`
   file). Design tokens are CSS variables under `@theme inline`.
 - Path alias `@/*` → `src/*` (see `tsconfig.json` / `components.json` aliases).
+- `recharts` (via shadcn's `chart` wrapper, `src/components/ui/chart.tsx`) is
+  used only under `/stats` — see "Statistics & AI analysis" for a load-bearing
+  animation gotcha before adding another chart.
 
 ## Data model — Question / QuestionAssessment
 
@@ -539,6 +546,98 @@ everywhere at once, rather than needing a link added to every page by hand.
 It is deliberately **not** rendered by the runners (`/sets/[id]`,
 `/tests/[sessionId]`): those are focused test-taking surfaces, and in exam
 mode the UI must not offer navigation out of a timed module.
+
+## Statistics & AI analysis
+
+`/stats` aggregates a profile's **entire** history — every `PracticeSet` and
+`ExamSession`, not just one set — into charts, rule-based insights, and an
+on-demand AI analysis. No schema changes: everything is computed on read
+from the existing `Attempt`/`PracticeSet`/`ExamSession` rows, which already
+carry the denormalized facet snapshot the contract's own comment says exists
+"so a future stats screen groups by skill with zero joins."
+
+**Layout, mirroring the `src/exams/`/`src/resources/` split between pure
+computation and I/O:**
+- `src/lib/stats/aggregate.ts` — pure, dependency-free functions (no
+  `@/prisma/db` import) that turn already-fetched rows into every chart's
+  dataset (`bySkill`, `byDomain`, `byDifficulty`, `byTimeOfDay`,
+  `calculatorUsage`, `markForReviewImpact`, `accuracyTrendDelta`, etc.) plus
+  `buildStatsBundle()`, the single entry point. `Attempt` carries no `mode`
+  column, so practice-vs-exam is resolved via a `setId -> PracticeSet.mode`
+  map built once inside `buildStatsBundle`.
+- `src/lib/stats/insights.ts` — `computeInsights()` turns the aggregates into
+  the handful of plain-English sentences shown as `Alert`s. Every rule has an
+  explicit minimum-sample-size guard (see the numbers inline) so a skill with
+  one graded question never drives a claim.
+- `src/lib/stats/load.ts` / `chat-history.ts` — the I/O half: `loadStatsBundle(profileId)`
+  runs the three `Attempt`/`PracticeSet`/`ExamSession` queries and calls
+  `buildStatsBundle`; `loadChatExcerpts(profileId)` separately pulls the 8
+  most recent non-empty `Attempt.chatMessages` conversations (truncated
+  per-conversation) for the AI to read. Both `src/app/stats/page.tsx` and
+  `src/actions/stats.ts` call these rather than querying directly, so the
+  page and the AI prompt never drift out of sync on what "the stats" are.
+- `src/lib/ai/stats-prompt.ts` / `stats-schema.ts` / `src/actions/stats.ts` —
+  the AI half, mirroring `coach-prompt.ts`'s shape (pure prompt builder in,
+  `generateObject` call in the action). `analyzeStats()` is a Server Action,
+  not a route handler, because `generateObject` is a single non-streaming
+  call — a plain action already returns exactly that.
+
+**Practice-mode and exam-mode stats are never blended** — a practice-set
+accuracy percentage and an exam's scaled section score (200–800) measure
+different things, so they get separate tabs (`stats-client.tsx`'s
+`Tabs`) and separate insight IDs (`exam-trend` is the one exam-specific
+insight; everything else is practice-only). The one exception is the
+headline KPI row, which only shows numbers that don't depend on
+practice-only tool-usage columns exams don't have.
+
+**Recommended sets reuse `createSet` (`src/actions/sets.ts`) completely
+unmodified** — `RawSetFilters` already supports `domainCodes`/`skillCodes`
+as first-class arrays, so an AI recommendation is just a `RawSetFilters`
+object with `skillCodes` set and `sectionCodes`/`domainCodes` left as `[]`
+(which `validateSetFilters` expands from the skill's own domain). No new
+set-creation code path was needed for "AI creates a set you can start."
+
+**Structured AI output: every schema field must be in `required`, so never
+use zod `.default()` or `.optional()` on `AnalysisSchema`
+(`src/lib/ai/stats-schema.ts`).** Some models routed through OpenRouter run
+behind a strict JSON-schema backend (observed with an Azure-hosted model)
+that rejects a schema where a property is missing from its object's
+`required` array — which is exactly what a zod `.default(...)` produces.
+This surfaced as a runtime failure only when the "Analyze my performance"
+button was actually clicked: `[Azure] Invalid schema for response_format
+'response': ... 'required' is required to be supplied and to be an array
+including every key in properties. Missing 'difficulties'.` The fix is
+structural, not a try/catch: model every field as a plain required value,
+using an empty array (never an omitted key) as the "not applicable" case —
+see `troubleSpots`/`difficulties`'s comments in `stats-schema.ts`.
+
+**Recharts bars/lines needed `isAnimationActive={false}` on every `<Bar>`/
+`<Line>`.** Without it, the very first mount after a Turbopack dev-mode
+recompile reliably left every bar chart's `<g class="recharts-bar-rectangles">`
+completely empty (zero child elements, no console error, just a blank card)
+— confirmed by inspecting the raw SVG, not just a visual glance. A reload
+fixed it every time, consistent with an animation/StrictMode timing race
+rather than a data or config bug. Disabling per-shape animation sidesteps it
+entirely and costs nothing for a stats dashboard (instant, static charts are
+the right UX here anyway, not a grow-in animation). If you add a new chart,
+copy this from `rate-bar-chart.tsx`/`difficulty-bar-chart.tsx`/
+`accuracy-trend-chart.tsx`/`exam-score-chart.tsx` rather than rediscovering
+it — and when debugging *any* "chart renders blank, no error" report here,
+rule out a stale `next start`/`next dev` process still bound to the port
+serving mismatched build output before assuming it's a code regression
+(that cost real debugging time once already: an old server process left
+running after a rebuild served a page that referenced the new chunk hashes
+against the old server's in-memory module graph).
+
+**A bar chart's width *is* its value, so an exact 0% bar is invisible by
+construction** — every `<Bar>` also sets `minPointSize={2}` so a
+0%-accuracy category still shows a visible sliver instead of looking
+indistinguishable from "no data for this category at all."
+
+`SiteNav`'s `Half` type (`src/components/site-nav.tsx`) is `"learn" |
+"practice" | "stats"` — `/stats` is its own top-level header pill (not
+nested under Practice), with a single-item `links` sub-row ("Overview") for
+consistency with how `Learn`'s pill also carries an "Overview" sub-link.
 
 ## Repo layout notes
 
