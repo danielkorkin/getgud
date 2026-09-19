@@ -1089,10 +1089,25 @@
                   "kind": "scalar"
                 }
               },
+              "sectionOrder": {
+                "many": true,
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "setId": {
                 "nullable": false,
                 "type": {
                   "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "splitSitting": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
                   "kind": "scalar"
                 }
               },
@@ -1207,8 +1222,14 @@
                 "rwVariant": {
                   "column": "rwVariant"
                 },
+                "sectionOrder": {
+                  "column": "sectionOrder"
+                },
                 "setId": {
                   "column": "setId"
+                },
+                "splitSitting": {
+                  "column": "splitSitting"
                 },
                 "startedAt": {
                   "column": "startedAt"
@@ -3113,6 +3134,13 @@
               ]
             },
             "exam_session": {
+              "checks": [
+                {
+                  "expression": "array_position(\"sectionOrder\", NULL) IS NULL",
+                  "name": "exam_session_sectionOrder_elem_not_null_364620b0",
+                  "prefix": "exam_session_sectionOrder_elem_not_null"
+                }
+              ],
               "columns": {
                 "assessment": {
                   "codecId": "pg/text@1",
@@ -3193,9 +3221,28 @@
                   "nativeType": "text",
                   "nullable": true
                 },
+                "sectionOrder": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": []
+                  },
+                  "many": true,
+                  "nativeType": "text",
+                  "nullable": false
+                },
                 "setId": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
+                  "nullable": false
+                },
+                "splitSitting": {
+                  "codecId": "pg/bool@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": false
+                  },
+                  "nativeType": "bool",
                   "nullable": false
                 },
                 "startedAt": {
@@ -4031,7 +4078,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "a5e1f214c6745c1d9769007e439a8a8eb50292950919223cec68b52121272292"
+    "storageHash": "ed5bffaac3428ea9c29c4f9323d47c367b4a80a8973a3ebc165fc78ddf8c9d0f"
   },
   "capabilities": {
     "postgres": {

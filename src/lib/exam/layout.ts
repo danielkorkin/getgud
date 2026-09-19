@@ -18,12 +18,20 @@ export interface ModulePosition {
  * invariant (see validateBlueprint). This is what lets module-2
  * PracticeSetItem rows be inserted later, after routing, at a
  * position range that was already reserved.
+ *
+ * `sectionOrder` is the student's chosen runtime order (slots 1-2 go to
+ * `sectionOrder[0]`, slots 3-4 to `sectionOrder[1]`) — independent of the
+ * blueprint's own authored tuple order, which is fixed at design time.
  */
-export function modulePositions(bp: ExamBlueprint): ModulePosition[] {
-  const [rw, math] = bp.sections;
+export function modulePositions(
+  bp: ExamBlueprint,
+  sectionOrder: readonly [ExamSectionCode, ExamSectionCode],
+): ModulePosition[] {
+  const bySection = new Map(bp.sections.map((s) => [s.sectionCode, s] as const));
   let cursor = 0;
   const positions: ModulePosition[] = [];
-  for (const section of [rw, math]) {
+  for (const code of sectionOrder) {
+    const section = bySection.get(code)!;
     positions.push({
       sectionCode: section.sectionCode,
       moduleIndex: 1,
@@ -45,13 +53,18 @@ export function modulePositions(bp: ExamBlueprint): ModulePosition[] {
   return positions;
 }
 
-export function totalQuestionCount(bp: ExamBlueprint): number {
-  return modulePositions(bp).reduce((sum, m) => sum + m.itemCount, 0);
+export function totalQuestionCount(bp: ExamBlueprint, sectionOrder: readonly [ExamSectionCode, ExamSectionCode]): number {
+  return modulePositions(bp, sectionOrder).reduce((sum, m) => sum + m.itemCount, 0);
 }
 
-export function moduleForPosition(bp: ExamBlueprint, position: number): ModulePosition | null {
+export function moduleForPosition(
+  bp: ExamBlueprint,
+  position: number,
+  sectionOrder: readonly [ExamSectionCode, ExamSectionCode],
+): ModulePosition | null {
   return (
-    modulePositions(bp).find((m) => position >= m.startPosition && position < m.startPosition + m.itemCount) ?? null
+    modulePositions(bp, sectionOrder).find((m) => position >= m.startPosition && position < m.startPosition + m.itemCount) ??
+    null
   );
 }
 

@@ -368,10 +368,23 @@ model ExamSession {
   examId     String // registry key from src/exams/index.ts — NOT a FK; blueprints are committed code, not rows
   assessment String
 
-  phase String // one of EXAM_PHASES (src/lib/exam/phases.ts) — rw_1_directions .. completed
+  phase String // one of EXAM_PHASES (src/lib/exam/phases.ts) — m1_directions .. completed
 
-  // Score snapshot, written once at completion (src/exams/scoring.ts) rather
-  // than recomputed on the results page — so re-tuning a blueprint's scaled
+  // Which physical section occupies slot 1/2 vs slot 3/4 for this session —
+  // a 2-element permutation of "RW"/"MATH" chosen by the student at start.
+  // Phases are slot-generic (m1..m4); phaseModule() resolves a slot to a
+  // section via this array. See src/lib/exam/phases.ts's file comment.
+  sectionOrder String[] @default([])
+  // Student opted into "take one section now, finish the other later" at
+  // start. Never gates a phase transition — copy/labeling only (the break
+  // phase already tolerates an arbitrary gap regardless of this flag).
+  splitSitting Boolean @default(false)
+
+  // Score snapshot (src/exams/scoring.ts). A section's own 3 fields are
+  // written as soon as that section's second module is submitted (so its
+  // score can be shown before the other section is done); all 7 are written
+  // together again at full completion. Either way, once written they are
+  // never recomputed on the results page — so re-tuning a blueprint's scaled
   // table later can never rewrite a completed test's history.
   rwVariant   String? // 'lower' | 'upper'
   rwRaw       Int?

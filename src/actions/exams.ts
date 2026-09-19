@@ -11,19 +11,26 @@ import { renderContentField } from "@/lib/content/render";
 import { gradeAnswer, normalizeSprResponse, type AnswerOption } from "@/lib/grading";
 import { toJsonValue } from "@/lib/json";
 import { getExam, isExamVisible } from "@/exams";
-import { routeVariant, scoreExam } from "@/exams/scoring";
-import type { ExamBlueprint, SectionBlueprint, Variant } from "@/exams/spec";
+import { routeVariant, scaleSection, scoreExam } from "@/exams/scoring";
+import type { ExamBlueprint, ExamSectionCode, SectionBlueprint, Variant } from "@/exams/spec";
 import { checkExamAvailability } from "@/lib/exam/availability";
 import { modulePositions, totalQuestionCount } from "@/lib/exam/layout";
 import {
   activePhaseFor,
   isDirectionsPhase,
   isExamPhase,
+  isFinalActivePhase,
+  isSectionOrder,
   nextPhaseAfterSubmit,
   phaseModule,
   type ExamPhase,
 } from "@/lib/exam/phases";
 import type { RenderedOption } from "@/actions/attempts";
+
+/** Guards a session row's stored `sectionOrder`, falling back to the historical RW-then-MATH default for a pre-migration row. */
+function resolveSectionOrder(raw: unknown): readonly [ExamSectionCode, ExamSectionCode] {
+  return isSectionOrder(raw) ? raw : ["RW", "MATH"];
+}
 
 // ─── Facet lookup ────────────────────────────────────────────────────────
 // Mirrors src/lib/query/generate-set.ts's join, but keyed by an explicit id
@@ -73,7 +80,10 @@ async function fetchFacets(assessment: string, ids: readonly string[]): Promise<
 
 // ─── startExam ───────────────────────────────────────────────────────────
 
-export async function startExam(examId: string): Promise<{ error: string } | never> {
+export async function startExam(
+  examId: string,
+  opts?: { sectionOrder?: readonly [ExamSectionCode, ExamSectionCode]; splitSitting?: boolean },
+): Promise<{ error: string } | never> {
   const profileId = await requireProfileId();
   const blueprint = getExam(examId);
   if (!blueprint || !isExamVisible(blueprint)) return { error: "Unknown exam." };
@@ -85,7 +95,12 @@ export async function startExam(examId: string): Promise<{ error: string } | nev
     };
   }
 
-  const positions = modulePositions(blueprint);
+  const sectionOrder: readonly [ExamSectionCode, ExamSectionCode] = isSectionOrder(opts?.sectionOrder)
+    ? opts.sectionOrder
+    : ["RW", "MATH"];
+  const splitSitting = opts?.splitSitting ?? false;
+
+  const positions = modulePositions(blueprint, sectionOrder);
   const rwModule1Pos = positions.find((p) => p.sectionCode === "RW" && p.moduleIndex === 1)!;
   const mathModule1Pos = positions.find((p) => p.sectionCode === "MATH" && p.moduleIndex === 1)!;
   const [rw, math] = blueprint.sections;
@@ -109,7 +124,7 @@ export async function startExam(examId: string): Promise<{ error: string } | nev
       assessment: blueprint.assessment,
       sectionCodes: ["RW", "MATH"],
       difficulties: [],
-      questionCount: totalQuestionCount(blueprint),
+      questionCount: totalQuestionCount(blueprint, sectionOrder),
       currentIndex: 0,
       correctCount: 0,
       gradedCount: 0,
@@ -123,7 +138,9 @@ export async function startExam(examId: string): Promise<{ error: string } | nev
       profileId,
       examId,
       assessment: blueprint.assessment,
-      phase: "rw_1_directions",
+      phase: "m1_directions",
+      sectionOrder: [...sectionOrder],
+      splitSitting,
       createdAt: now,
     });
 
@@ -201,11 +218,12 @@ export async function startModule(sessionId: string): Promise<StartModuleResult>
   if (!session || !isExamPhase(session.phase)) throw new Error("Exam session not found.");
 
   const modulesNow = await db.orm.public.ExamModule.where({ sessionId }).all();
+  const sectionOrder = resolveSectionOrder(session.sectionOrder);
 
   if (!isDirectionsPhase(session.phase)) {
     // Idempotent: already active (or break/completed) — report current
     // state instead of restarting anything.
-    const target = phaseModule(session.phase);
+    const target = phaseModule(session.phase, sectionOrder);
     const mod = target ? modulesNow.find((m) => m.sectionCode === target.sectionCode && m.moduleIndex === target.moduleIndex) : null;
     return {
       phase: session.phase,
@@ -218,7 +236,7 @@ export async function startModule(sessionId: string): Promise<StartModuleResult>
 
   const directionsPhase = session.phase;
   const activePhase = activePhaseFor(directionsPhase);
-  const target = phaseModule(activePhase)!;
+  const target = phaseModule(activePhase, sectionOrder)!;
   const mod = modulesNow.find((m) => m.sectionCode === target.sectionCode && m.moduleIndex === target.moduleIndex);
   if (!mod) throw new Error("Exam module not found.");
 
@@ -420,7 +438,8 @@ export async function submitModule(sessionId: string, opts?: { auto?: boolean })
   }
 
   const activePhase = sessionBefore.phase;
-  const target = phaseModule(activePhase)!;
+  const sectionOrder = resolveSectionOrder(sessionBefore.sectionOrder);
+  const target = phaseModule(activePhase, sectionOrder)!;
   const modulesBefore = await db.orm.public.ExamModule.where({ sessionId }).all();
   const mod = modulesBefore.find((m) => m.sectionCode === target.sectionCode && m.moduleIndex === target.moduleIndex);
   if (!mod) throw new Error("Exam module not found.");
@@ -526,17 +545,32 @@ export async function submitModule(sessionId: string, opts?: { auto?: boolean })
       await tx.orm.public.PracticeSet.where({ id: sessionId }).update({ currentIndex: m2.startPosition });
     }
 
-    if (activePhase === "rw_2_active") {
+    if (activePhase === "m2_active") {
       // Per the "nothing auto-starts" rule, the break's own countdown does
       // not begin here — breakStartedAt/breakEndsAt stay NULL until the
       // student explicitly starts it (see startBreak below). The break
       // screen itself has no timer to auto-start; only the module clocks
       // do, and this phase transition shows that screen, nothing more.
-      await tx.orm.public.ExamSession.where({ id: sessionId }).update({ phase: nextPhase });
+      //
+      // This section (whichever of RW/MATH the student chose to run first)
+      // is fully graded now — write its own 3 score fields early so the
+      // break screen can show a real scaled score before the other section
+      // exists. scoreExam()'s final write at whole-exam completion (below)
+      // harmlessly re-writes the same numbers for this section.
+      const m1 = modulesBefore.find((m) => m.sectionCode === target.sectionCode && m.moduleIndex === 1)!;
+      const sectionRaw = (m1.rawCorrect ?? 0) + rawCorrect;
+      const sectionVariant = (mod.variant as Variant) ?? "lower";
+      const sectionScaled = scaleSection(sectionBlueprint, sectionVariant, sectionRaw);
+      const scoreFields =
+        target.sectionCode === "RW"
+          ? { rwVariant: sectionVariant, rwRaw: sectionRaw, rwScaled: sectionScaled }
+          : { mathVariant: sectionVariant, mathRaw: sectionRaw, mathScaled: sectionScaled };
+
+      await tx.orm.public.ExamSession.where({ id: sessionId }).update({ phase: nextPhase, ...scoreFields });
       return;
     }
 
-    if (activePhase === "math_2_active") {
+    if (isFinalActivePhase(activePhase)) {
       const freshModules = await tx.orm.public.ExamModule.where({ sessionId }).all();
       const rw1 = freshModules.find((m) => m.sectionCode === "RW" && m.moduleIndex === 1)!;
       const rw2 = freshModules.find((m) => m.sectionCode === "RW" && m.moduleIndex === 2)!;
@@ -608,8 +642,8 @@ export async function skipBreak(sessionId: string): Promise<{ phase: ExamPhase }
   const session = await db.orm.public.ExamSession.first({ id: sessionId, profileId });
   if (!session || !isExamPhase(session.phase)) throw new Error("Exam session not found.");
   if (session.phase !== "break") return { phase: session.phase };
-  await db.orm.public.ExamSession.where({ id: sessionId, phase: "break" }).update({ phase: "math_1_directions" });
-  return { phase: "math_1_directions" };
+  await db.orm.public.ExamSession.where({ id: sessionId, phase: "break" }).update({ phase: "m3_directions" });
+  return { phase: "m3_directions" };
 }
 
 export async function abandonExam(sessionId: string): Promise<void> {

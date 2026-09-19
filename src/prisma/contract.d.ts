@@ -34,7 +34,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'a5e1f214c6745c1d9769007e439a8a8eb50292950919223cec68b52121272292'>;
+  StorageHashBase<'ed5bffaac3428ea9c29c4f9323d47c367b4a80a8973a3ebc165fc78ddf8c9d0f'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
@@ -328,6 +328,8 @@ export type FieldOutputTypes = {
       readonly examId: CodecTypes['pg/text@1']['output'];
       readonly assessment: CodecTypes['pg/text@1']['output'];
       readonly phase: CodecTypes['pg/text@1']['output'];
+      readonly sectionOrder: ReadonlyArray<CodecTypes['pg/text@1']['output']>;
+      readonly splitSitting: CodecTypes['pg/bool@1']['output'];
       readonly rwVariant: CodecTypes['pg/text@1']['output'] | null;
       readonly rwRaw: CodecTypes['pg/int4@1']['output'] | null;
       readonly rwScaled: CodecTypes['pg/int4@1']['output'] | null;
@@ -523,6 +525,8 @@ export type FieldInputTypes = {
       readonly examId: CodecTypes['pg/text@1']['input'];
       readonly assessment: CodecTypes['pg/text@1']['input'];
       readonly phase: CodecTypes['pg/text@1']['input'];
+      readonly sectionOrder: ReadonlyArray<CodecTypes['pg/text@1']['input']>;
+      readonly splitSitting: CodecTypes['pg/bool@1']['input'];
       readonly rwVariant: CodecTypes['pg/text@1']['input'] | null;
       readonly rwRaw: CodecTypes['pg/int4@1']['input'] | null;
       readonly rwScaled: CodecTypes['pg/int4@1']['input'] | null;
@@ -727,7 +731,9 @@ export type StorageColumnTypes = {
       readonly rwRaw: CodecTypes['pg/int4@1']['output'] | null;
       readonly rwScaled: CodecTypes['pg/int4@1']['output'] | null;
       readonly rwVariant: CodecTypes['pg/text@1']['output'] | null;
+      readonly sectionOrder: ReadonlyArray<CodecTypes['pg/text@1']['output']>;
       readonly setId: CodecTypes['pg/text@1']['output'];
+      readonly splitSitting: CodecTypes['pg/bool@1']['output'];
       readonly startedAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
       readonly totalScaled: CodecTypes['pg/int4@1']['output'] | null;
     };
@@ -922,7 +928,9 @@ export type StorageColumnInputTypes = {
       readonly rwRaw: CodecTypes['pg/int4@1']['input'] | null;
       readonly rwScaled: CodecTypes['pg/int4@1']['input'] | null;
       readonly rwVariant: CodecTypes['pg/text@1']['input'] | null;
+      readonly sectionOrder: ReadonlyArray<CodecTypes['pg/text@1']['input']>;
       readonly setId: CodecTypes['pg/text@1']['input'];
+      readonly splitSitting: CodecTypes['pg/bool@1']['input'];
       readonly startedAt: CodecTypes['pg/timestamptz-string@1']['input'] | null;
       readonly totalScaled: CodecTypes['pg/int4@1']['input'] | null;
     };
@@ -1217,6 +1225,8 @@ export namespace Models {
     examId: CodecTypes['pg/text@1']['output'];
     assessment: CodecTypes['pg/text@1']['output'];
     phase: CodecTypes['pg/text@1']['output'];
+    sectionOrder: ReadonlyArray<CodecTypes['pg/text@1']['output']>;
+    splitSitting: CodecTypes['pg/bool@1']['output'];
     rwVariant: CodecTypes['pg/text@1']['output'] | null;
     rwRaw: CodecTypes['pg/int4@1']['output'] | null;
     rwScaled: CodecTypes['pg/int4@1']['output'] | null;
@@ -1951,6 +1961,24 @@ type ContractBase = Omit<
                   readonly nativeType: 'text';
                   readonly codecId: 'pg/text@1';
                   readonly nullable: false;
+                };
+                readonly sectionOrder: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/text@1', readonly []>;
+                  };
+                };
+                readonly splitSitting: {
+                  readonly nativeType: 'bool';
+                  readonly codecId: 'pg/bool@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/bool@1', false>;
+                  };
                 };
                 readonly rwVariant: {
                   readonly nativeType: 'text';
@@ -3291,6 +3319,15 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
+              readonly sectionOrder: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+                readonly many: true;
+              };
+              readonly splitSitting: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/bool@1' };
+              };
               readonly rwVariant: {
                 readonly nullable: true;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
@@ -3402,6 +3439,8 @@ type ContractBase = Omit<
                 readonly examId: { readonly column: 'examId' };
                 readonly assessment: { readonly column: 'assessment' };
                 readonly phase: { readonly column: 'phase' };
+                readonly sectionOrder: { readonly column: 'sectionOrder' };
+                readonly splitSitting: { readonly column: 'splitSitting' };
                 readonly rwVariant: { readonly column: 'rwVariant' };
                 readonly rwRaw: { readonly column: 'rwRaw' };
                 readonly rwScaled: { readonly column: 'rwScaled' };

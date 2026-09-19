@@ -3,8 +3,10 @@ import "server-only";
 import { db } from "@/prisma/db";
 import { requireProfileId } from "@/lib/profile";
 import { getExam } from "@/exams";
-import type { ExamBlueprint, Variant } from "@/exams/spec";
-import { isExamPhase, phaseModule, type ExamPhase } from "./phases";
+import type { ExamBlueprint, ExamSectionCode, Variant } from "@/exams/spec";
+import { isExamPhase, isSectionOrder, phaseModule, type ExamPhase } from "./phases";
+
+const DEFAULT_SECTION_ORDER: readonly [ExamSectionCode, ExamSectionCode] = ["RW", "MATH"];
 
 export interface ExamStateModule {
   id: string;
@@ -25,6 +27,8 @@ export interface ExamState {
   examId: string;
   blueprint: ExamBlueprint;
   phase: ExamPhase;
+  sectionOrder: readonly [ExamSectionCode, ExamSectionCode];
+  splitSitting: boolean;
   serverNow: string;
   modules: ExamStateModule[];
   set: { id: string; name: string; questionCount: number; currentIndex: number; status: string };
@@ -39,6 +43,8 @@ export interface ExamState {
     mathScaled: number;
     totalScaled: number;
   } | null;
+  /** Per-section score, available as soon as that section's own two modules are submitted — independent of the other section. */
+  sectionScores: Partial<Record<ExamSectionCode, { variant: Variant; raw: number; scaled: number }>>;
 }
 
 /** Loads everything a `/tests/[sessionId]` render needs, scoped to the current profile. Returns null if not found/not owned/not an exam set. */
@@ -69,11 +75,21 @@ export async function loadExamState(sessionId: string): Promise<ExamState | null
         }
       : null;
 
+  const sectionScores: ExamState["sectionScores"] = {};
+  if (session.rwVariant && session.rwRaw !== null && session.rwScaled !== null) {
+    sectionScores.RW = { variant: session.rwVariant as Variant, raw: session.rwRaw, scaled: session.rwScaled };
+  }
+  if (session.mathVariant && session.mathRaw !== null && session.mathScaled !== null) {
+    sectionScores.MATH = { variant: session.mathVariant as Variant, raw: session.mathRaw, scaled: session.mathScaled };
+  }
+
   return {
     sessionId,
     examId: session.examId,
     blueprint,
-    phase: isExamPhase(session.phase) ? session.phase : "rw_1_directions",
+    phase: isExamPhase(session.phase) ? session.phase : "m1_directions",
+    sectionOrder: isSectionOrder(session.sectionOrder) ? session.sectionOrder : DEFAULT_SECTION_ORDER,
+    splitSitting: session.splitSitting,
     serverNow: new Date().toISOString(),
     modules: modules.map((m) => ({
       id: m.id,
@@ -92,12 +108,13 @@ export async function loadExamState(sessionId: string): Promise<ExamState | null
     breakStartedAt: session.breakStartedAt,
     breakEndsAt: session.breakEndsAt,
     scores,
+    sectionScores,
   };
 }
 
 /** The module for the session's current phase (null for 'break'/'completed'). */
 export function currentModule(state: ExamState): ExamStateModule | null {
-  const target = phaseModule(state.phase);
+  const target = phaseModule(state.phase, state.sectionOrder);
   if (!target) return null;
   return state.modules.find((m) => m.sectionCode === target.sectionCode && m.moduleIndex === target.moduleIndex) ?? null;
 }

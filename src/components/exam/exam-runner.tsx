@@ -36,7 +36,8 @@ import { ExamTimeExpired } from "./exam-time-expired";
 import { ExamQuestionNav, type ExamNavItemState } from "./exam-question-nav";
 import { ExamReviewPage } from "./exam-review-page";
 import { ArrowLeftIcon, ArrowRightIcon } from "@phosphor-icons/react";
-import type { ExamPhase } from "@/lib/exam/phases";
+import { isFinalActivePhase, type ExamPhase } from "@/lib/exam/phases";
+import type { ExamSectionCode, Variant } from "@/exams/spec";
 
 export interface ExamRunnerModule {
   sectionCode: "RW" | "MATH";
@@ -54,6 +55,9 @@ export interface ExamRunnerProps {
   phase: ExamPhase;
   serverNow: string;
   module: ExamRunnerModule | null;
+  sectionOrder: readonly [ExamSectionCode, ExamSectionCode];
+  splitSitting: boolean;
+  sectionScores: Partial<Record<ExamSectionCode, { variant: Variant; raw: number; scaled: number }>>;
   breakStartedAt: string | null;
   breakEndsAt: string | null;
   initialPosition: number;
@@ -68,6 +72,9 @@ export function ExamRunner({
   phase,
   serverNow,
   module,
+  sectionOrder,
+  splitSitting,
+  sectionScores,
   breakStartedAt,
   breakEndsAt,
   initialPosition,
@@ -369,9 +376,9 @@ export function ExamRunner({
     if (expireHandledRef.current && auto) return;
     if (auto) expireHandledRef.current = true;
     flushTimers();
-    // set_complete means the whole 98-question exam is done, not just this
-    // module — only true when submitting the final (Math Module 2) module.
-    if (phase === "math_2_active") {
+    // set_complete means the whole exam is done, not just this module —
+    // only true when submitting the final module (slot 4).
+    if (isFinalActivePhase(phase)) {
       eventBufferRef.current?.record("set_complete", elapsedSinceStart());
     }
     await eventBufferRef.current?.flush();
@@ -467,6 +474,10 @@ export function ExamRunner({
 
           {phase === "break" && (
             <ExamBreak
+              justFinishedSection={sectionOrder[0]}
+              nextSection={sectionOrder[1]}
+              justFinishedScore={sectionScores[sectionOrder[0]]?.scaled ?? null}
+              splitSitting={splitSitting}
               breakStartedAt={breakStartedAt}
               breakEndsAt={breakEndsAt}
               serverNow={serverNow}

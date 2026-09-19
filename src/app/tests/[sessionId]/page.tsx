@@ -49,6 +49,9 @@ export default async function ExamRunnerPage({ params }: PageProps<"/tests/[sess
       phase={state.phase}
       serverNow={state.serverNow}
       module={mod}
+      sectionOrder={state.sectionOrder}
+      splitSitting={state.splitSitting}
+      sectionScores={state.sectionScores}
       breakStartedAt={state.breakStartedAt}
       breakEndsAt={state.breakEndsAt}
       initialPosition={initialPosition}

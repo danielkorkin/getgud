@@ -22,7 +22,10 @@ password). Alongside that, `/tests` offers full-length, timed, adaptive SAT
 practice tests — the same committed set of questions on every self-hosted
 copy of Getgud, with module-scoped timers, routing into an easier or harder
 second module based on first-module performance, and a scaled score out of
-1600 at the end.
+1600 at the end. You can also choose which section to take first and, if you
+don't have time for both in one sitting, finish one section now and pick up
+the other later — your scaled score for a section shows up as soon as it's
+done, and the results page notes when a test was split across two sittings.
 
 The app is divided into two halves. **Practice** is everything above.
 **Learn** (`/learn`) is a study library: original cheat sheets and strategy

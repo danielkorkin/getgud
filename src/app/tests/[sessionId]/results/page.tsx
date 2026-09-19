@@ -82,6 +82,10 @@ export default async function ExamResultsPage({ params }: PageProps<"/tests/[ses
   const mathRows = rows.filter((r) => r.sectionCode === "MATH");
   const totalActiveMs = attempts.reduce((sum, a) => sum + a.activeMs, 0);
 
+  const SECTION_LABEL: Record<"RW" | "MATH", string> = { RW: "Reading and Writing", MATH: "Math" };
+  const firstFinishedAt = state.modules.find((m) => m.sectionCode === state.sectionOrder[0] && m.moduleIndex === 2)?.submittedAt;
+  const secondStartedAt = state.modules.find((m) => m.sectionCode === state.sectionOrder[1] && m.moduleIndex === 1)?.startedAt;
+
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-6 py-16">
       <header className="flex flex-col gap-1">
@@ -94,6 +98,28 @@ export default async function ExamResultsPage({ params }: PageProps<"/tests/[ses
           Total active time: {formatDuration(totalActiveMs)}
         </p>
       </header>
+
+      {state.splitSitting && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Taken in two sittings</CardTitle>
+            <CardDescription>
+              You took {SECTION_LABEL[state.sectionOrder[0]]} and {SECTION_LABEL[state.sectionOrder[1]]} separately.
+              {firstFinishedAt && (
+                <>
+                  {" "}
+                  {SECTION_LABEL[state.sectionOrder[0]]} finished {new Date(firstFinishedAt).toLocaleString()}
+                </>
+              )}
+              {secondStartedAt && (
+                <>
+                  ; {SECTION_LABEL[state.sectionOrder[1]]} started {new Date(secondStartedAt).toLocaleString()}.
+                </>
+              )}
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Card>

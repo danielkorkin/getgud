@@ -4,12 +4,15 @@ import { db } from "@/prisma/db";
 import { getCurrentProfile } from "@/lib/profile";
 import { EXAMS, isExamVisible } from "@/exams";
 import { checkExamAvailability } from "@/lib/exam/availability";
-import { startExam } from "@/actions/exams";
+import { isBetweenSections, isExamPhase, isSectionOrder } from "@/lib/exam/phases";
+import { StartExamDialog } from "@/components/exam/start-exam-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SiteNav } from "@/components/site-nav";
 import { ClockIcon, WarningCircleIcon } from "@phosphor-icons/react/dist/ssr";
+
+const SECTION_LABEL: Record<"RW" | "MATH", string> = { RW: "Reading and Writing", MATH: "Math" };
 
 export default async function TestsPage() {
   const profile = await getCurrentProfile();
@@ -50,12 +53,19 @@ export default async function TestsPage() {
         {rows.map(({ bp, availability, latest }) => {
           const totalMinutes = bp.sections.reduce((sum, s) => sum + s.minutesPerModule * 2, 0) + bp.breakMinutes;
           const status = latest?.set.status;
+          const phase = latest?.session.phase;
+          const betweenSections = status === "in_progress" && phase != null && isExamPhase(phase) && isBetweenSections(phase);
+          const sectionOrder = isSectionOrder(latest?.session.sectionOrder) ? latest.session.sectionOrder : (["RW", "MATH"] as const);
+          const finishedSection = sectionOrder[0];
+          const finishedScore = finishedSection === "RW" ? latest?.session.rwScaled : latest?.session.mathScaled;
+          const remainingSection = sectionOrder[1];
           return (
             <Card key={bp.id}>
               <CardHeader>
                 <div className="flex items-center justify-between gap-2">
                   <CardTitle className="text-base">{bp.name}</CardTitle>
-                  {status === "in_progress" && <Badge variant="tag-blue">In progress</Badge>}
+                  {betweenSections && <Badge variant="tag-blue">1 of 2 sections done</Badge>}
+                  {status === "in_progress" && !betweenSections && <Badge variant="tag-blue">In progress</Badge>}
                   {status === "completed" && <Badge variant="tag-green">Completed</Badge>}
                 </div>
                 <CardDescription className="flex items-center gap-1.5">
@@ -77,21 +87,27 @@ export default async function TestsPage() {
                     Last score: <span className="font-medium text-foreground">{latest.session.totalScaled}</span> / 1600
                   </p>
                 )}
+                {betweenSections && (
+                  <p className="text-sm text-muted-foreground">
+                    {SECTION_LABEL[finishedSection]}
+                    {finishedScore != null && (
+                      <>
+                        : <span className="font-mono font-medium text-foreground">{finishedScore}</span> / 800
+                      </>
+                    )}{" "}
+                    done — {SECTION_LABEL[remainingSection]} remaining.
+                  </p>
+                )}
                 {status === "in_progress" && latest ? (
                   <Button render={<Link href={`/tests/${latest.session.setId}`} />} nativeButton={false}>
-                    Resume
+                    {betweenSections ? `Resume — ${SECTION_LABEL[remainingSection]}` : "Resume"}
                   </Button>
                 ) : (
-                  <form
-                    action={async () => {
-                      "use server";
-                      await startExam(bp.id);
-                    }}
-                  >
-                    <Button type="submit" disabled={!availability.available}>
-                      {status === "completed" ? "Retake" : "Start test"}
-                    </Button>
-                  </form>
+                  <StartExamDialog
+                    examId={bp.id}
+                    triggerLabel={status === "completed" ? "Retake" : "Start test"}
+                    disabled={!availability.available}
+                  />
                 )}
                 {status === "completed" && latest && (
                   <Button

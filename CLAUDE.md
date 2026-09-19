@@ -30,7 +30,10 @@ cookie-based profiles (no auth); three API routes (`/api/hint` and
 practice mode —
 premade, full-length, timed, adaptive SAT practice tests (`/tests`,
 `/tests/[sessionId]`, `/tests/[sessionId]/results`) that are identical on
-every self-hosted instance; and a deep statistics page (`/stats`) that
+every self-hosted instance, letting a student choose which section goes
+first and optionally take the two sections in separate sittings, with a
+scaled score shown for a section as soon as it's finished; and a deep
+statistics page (`/stats`) that
 aggregates every practice set and practice test into charts, rule-based
 insights, and an on-demand AI analysis that can also mine past coach
 conversations for recurring trouble and generate new targeted practice sets
@@ -365,6 +368,34 @@ rather than forking it — see the file comment above `ExamSession` in
 means something different in this mode (a response exists vs. graded and
 revealed).
 
+**Section order and "one section at a time" are runtime choices, stored on
+`ExamSession`, not properties of the blueprint.** A student picks which
+section (`RW` or `MATH`) goes first, and optionally opts into pausing between
+sections, in a dialog on `/tests` (`StartExamDialog`); `startExam(examId,
+{sectionOrder, splitSitting})` persists both as `ExamSession.sectionOrder`
+(a 2-element permutation) and `.splitSitting`. This is why the phase machine
+(`src/lib/exam/phases.ts`) is slot-generic — `m1_directions` .. `m4_active` /
+`break` / `completed`, not section-named — rather than the `rw_1_*`/`math_1_*`
+names an earlier version used: `phaseModule(phase, sectionOrder)` is the one
+function that resolves a slot to a section, so `nextPhaseAfterSubmit` and
+`activePhaseFor` never need to know which physical section is running.
+`modulePositions` (`src/lib/exam/layout.ts`) takes the same `sectionOrder` to
+lay out `PracticeSetItem` positions in whichever order was chosen. A
+section's own three score fields are written as soon as that section's
+second module is submitted (`submitModule`'s `m2_active` branch, calling
+`scaleSection` directly rather than waiting for `scoreExam` at full
+completion) — this is what lets the break screen show a real scaled score
+for the section that just finished, exposed read-side as
+`ExamState.sectionScores`, before the other section even exists. The break
+screen also gets a plain `Link` back to `/tests` ("Finish for now — I'll do
+{next} later") with **no new server action**, since nothing in the phase
+machine ever auto-advances past `break` regardless of `splitSitting` — that
+flag only changes copy/emphasis, never gates a transition. `/tests`
+distinguishes this "1 of 2 sections done" resume state
+(`isBetweenSections(phase)`) from a generic in-progress one, and the results
+page shows a "taken in two sittings" note only when `splitSitting` was
+chosen at start.
+
 **`src/lib/access.ts`'s `getOwnedItem` takes an `ItemAccessPolicy`,
 defaulting to `'practice-only'` — this is the single most important
 correctness mechanism in the whole feature.** Every existing practice
@@ -384,8 +415,8 @@ active-module + deadline gate for `mode: 'exam'` sets. Never add a new
 caller of `getOwnedItem` that skips this default without a specific reason.
 
 **No module timer ever starts automatically — only on an explicit
-Continue/Start click**, including the break between Reading & Writing and
-Math. Expiry is derived at read time (`isModuleExpired` in
+Continue/Start click**, including the break between the two sections
+(whichever order the student chose). Expiry is derived at read time (`isModuleExpired` in
 `src/lib/exam/state.ts`), never written as a stored phase or triggered from
 inside an RSC render — see `src/lib/exam/phases.ts`'s file comment.
 `submitModule` (`src/actions/exams.ts`) is idempotent via a conditional
