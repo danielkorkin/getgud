@@ -1,9 +1,11 @@
 // Wipes every profile and everything that hangs off a profile — practice
 // sets, attempts, exam sessions/modules, event telemetry — while leaving the
-// College Board question bank (question, question_assessment) and the AI
-// hint cache (question_hint, shared across profiles, expensive to
-// regenerate) completely untouched. Safe to run any time; does not touch
-// the scrape/convert/load pipeline's output at all.
+// College Board question bank (question, question_assessment), the AI hint
+// cache (question_hint), and the "View similar problems" embedding cache
+// (question_embedding — also shared across profiles, also expensive to
+// regenerate, same reasoning as question_hint) completely untouched. Safe to
+// run any time; does not touch the scrape/convert/load/embed pipeline's
+// output at all.
 //
 // TRUNCATE ... CASCADE on `profile` is sufficient on its own: every
 // user-data table (practice_set, practice_set_item, attempt, attempt_event,
@@ -11,24 +13,26 @@
 // chain of `onDelete: Cascade` foreign keys (see contract.prisma), and
 // Postgres's CASCADE truncates the whole dependency chain transitively, not
 // just direct references. Nothing that only *references* profile-owned rows
-// (question, question_assessment, question_hint — all referenced BY those
-// tables, never the reverse) gets touched, because TRUNCATE CASCADE only
-// follows the "who points at me" direction.
+// (question, question_assessment, question_hint, question_embedding — all
+// referenced BY those tables, never the reverse) gets touched, because
+// TRUNCATE CASCADE only follows the "who points at me" direction.
 //
 // Dry-run by default — pass --yes to actually execute.
 
 import { db } from "../src/prisma/db";
 
 async function countAll() {
-  const [profile, practiceSet, attempt, examSession, question, questionAssessment, questionHint] = await Promise.all([
-    db.orm.public.Profile.aggregate((a) => ({ n: a.count() })),
-    db.orm.public.PracticeSet.aggregate((a) => ({ n: a.count() })),
-    db.orm.public.Attempt.aggregate((a) => ({ n: a.count() })),
-    db.orm.public.ExamSession.aggregate((a) => ({ n: a.count() })),
-    db.orm.public.Question.aggregate((a) => ({ n: a.count() })),
-    db.orm.public.QuestionAssessment.aggregate((a) => ({ n: a.count() })),
-    db.orm.public.QuestionHint.aggregate((a) => ({ n: a.count() })),
-  ]);
+  const [profile, practiceSet, attempt, examSession, question, questionAssessment, questionHint, questionEmbedding] =
+    await Promise.all([
+      db.orm.public.Profile.aggregate((a) => ({ n: a.count() })),
+      db.orm.public.PracticeSet.aggregate((a) => ({ n: a.count() })),
+      db.orm.public.Attempt.aggregate((a) => ({ n: a.count() })),
+      db.orm.public.ExamSession.aggregate((a) => ({ n: a.count() })),
+      db.orm.public.Question.aggregate((a) => ({ n: a.count() })),
+      db.orm.public.QuestionAssessment.aggregate((a) => ({ n: a.count() })),
+      db.orm.public.QuestionHint.aggregate((a) => ({ n: a.count() })),
+      db.orm.public.QuestionEmbedding.aggregate((a) => ({ n: a.count() })),
+    ]);
   return {
     profile: profile.n,
     practiceSet: practiceSet.n,
@@ -37,6 +41,7 @@ async function countAll() {
     question: question.n,
     questionAssessment: questionAssessment.n,
     questionHint: questionHint.n,
+    questionEmbedding: questionEmbedding.n,
   };
 }
 
@@ -52,6 +57,7 @@ async function main(): Promise<void> {
   console.log(`  (preserved) question: ${before.question}`);
   console.log(`  (preserved) question_assessment: ${before.questionAssessment}`);
   console.log(`  (preserved) question_hint: ${before.questionHint}`);
+  console.log(`  (preserved) question_embedding: ${before.questionEmbedding}`);
 
   if (!confirmed) {
     console.log(
@@ -76,6 +82,7 @@ async function main(): Promise<void> {
   console.log(`  (preserved) question: ${after.question}`);
   console.log(`  (preserved) question_assessment: ${after.questionAssessment}`);
   console.log(`  (preserved) question_hint: ${after.questionHint}`);
+  console.log(`  (preserved) question_embedding: ${after.questionEmbedding}`);
 
   await db.close();
 }

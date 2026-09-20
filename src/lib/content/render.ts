@@ -44,6 +44,21 @@ DOMPurify.addHook("uponSanitizeAttribute", (node, data) => {
 const MATH_TAG_RE = /<math\b[^>]*>[\s\S]*?<\/math>/g;
 const ALTTEXT_ATTR_RE = /\balttext="([^"]*)"/;
 const MATH_LATEX_SPAN_RE = /<span class="math-latex" data-latex="([^"]*)">([\s\S]*?)<\/span>/g;
+const TABLE_TAG_RE = /<table\b[^>]*>[\s\S]*?<\/table>/g;
+
+/**
+ * Wrap each `<table>` (a data table in a stimulus/stem — College Board's own
+ * markup, not something this pipeline generates) in a scroll container and
+ * strip the legacy `border` attribute College Board's HTML carries, which
+ * would otherwise double up with the `.qbank-table-wrap` CSS rules in
+ * globals.css. Run after DOMPurify so the wrapper `<div>` never has to pass
+ * through sanitization itself.
+ */
+function wrapTables(html: string): string {
+  return html.replace(TABLE_TAG_RE, (table) =>
+    `<div class="qbank-table-wrap">${table.replace(/ border="[^"]*"/, "")}</div>`,
+  );
+}
 
 /**
  * Render one LaTeX string to sanitized KaTeX HTML, degrading to
@@ -147,9 +162,10 @@ export function renderContentField({ html, contentHash, field }: RenderContentFi
     ADD_TAGS: ["use"],
     ADD_ATTR: ["xlink:href"],
   });
+  const result = wrapTables(sanitized);
 
-  cacheSet(key, sanitized);
-  return sanitized;
+  cacheSet(key, result);
+  return result;
 }
 
 /**

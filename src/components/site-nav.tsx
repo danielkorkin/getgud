@@ -25,7 +25,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "cn";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { BooksIcon, ChartLineIcon, ExamIcon, GraduationCapIcon, LightbulbIcon, PlusIcon, StackIcon } from "@phosphor-icons/react";
+import {
+  BooksIcon,
+  ChartLineIcon,
+  ExamIcon,
+  GraduationCapIcon,
+  LightbulbIcon,
+  MagnifyingGlassIcon,
+  PlusIcon,
+  StackIcon,
+} from "@phosphor-icons/react";
 
 type Half = "learn" | "practice" | "stats";
 
@@ -54,6 +63,7 @@ const SECTIONS: Record<Half, { label: string; href: string; blurb: string; links
       { href: "/new", label: "New set", icon: PlusIcon },
       { href: "/sets", label: "Library", icon: BooksIcon },
       { href: "/tests", label: "Practice tests", icon: ExamIcon },
+      { href: "/problems", label: "Question bank", icon: MagnifyingGlassIcon },
     ],
   },
   stats: {
@@ -68,7 +78,9 @@ const SECTIONS: Record<Half, { label: string; href: string; blurb: string; links
 function halfForPath(pathname: string): Half | null {
   if (pathname.startsWith("/learn")) return "learn";
   if (pathname.startsWith("/stats")) return "stats";
-  if (pathname === "/new" || pathname.startsWith("/sets") || pathname.startsWith("/tests")) return "practice";
+  if (pathname === "/new" || pathname.startsWith("/sets") || pathname.startsWith("/tests") || pathname.startsWith("/problems")) {
+    return "practice";
+  }
   return null;
 }
 

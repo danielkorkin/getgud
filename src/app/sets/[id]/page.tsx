@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { db } from "@/prisma/db";
 import { getCurrentProfile } from "@/lib/profile";
 import { hintsConfigured } from "@/lib/ai/hint-provider";
+import { similarSearchAvailable } from "@/lib/query/similar-questions";
 import { PracticeRunner } from "@/components/practice/practice-runner";
 import type { NavItemState } from "@/components/practice/question-nav";
 
@@ -14,6 +15,10 @@ export default async function RunnerPage({ params }: PageProps<"/sets/[id]">) {
   if (!set) notFound();
   if (set.mode === "exam") redirect(`/tests/${id}`);
   if (set.status === "completed") redirect(`/sets/${id}/results`);
+  // A hand-picked draft with nothing added yet (src/app/problems) has no
+  // items — `Math.min(set.currentIndex, set.questionCount - 1)` below would
+  // evaluate to -1 for one. Send it back to where it's actually built.
+  if (set.questionCount === 0) redirect(`/problems?set=${id}`);
 
   const items = await db.orm.public.PracticeSetItem
     .where({ setId: id })
@@ -42,6 +47,7 @@ export default async function RunnerPage({ params }: PageProps<"/sets/[id]">) {
       startPosition={Math.min(set.currentIndex, set.questionCount - 1)}
       initialItems={navItems}
       hintsEnabled={hintsConfigured()}
+      similarSearchEnabled={await similarSearchAvailable()}
     />
   );
 }

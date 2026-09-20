@@ -24,6 +24,8 @@ export interface RenderedItemResult {
     questionId: string;
     position: number;
     type: string;
+    /** Which QuestionAssessment placement (SAT vs PSAT) this item snapshotted — a "View similar" link must browse the same bank. */
+    assessment: string;
     sectionCode: string;
     domainCode: string;
     skillCode: string;
@@ -167,6 +169,7 @@ export async function getRenderedItem(
       questionId: question.id,
       position: item.position,
       type: item.type,
+      assessment: item.assessment,
       sectionCode: item.sectionCode,
       domainCode: item.domainCode,
       skillCode: item.skillCode,

@@ -34,7 +34,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'ed5bffaac3428ea9c29c4f9323d47c367b4a80a8973a3ebc165fc78ddf8c9d0f'>;
+  StorageHashBase<'5a50ae8f065d104a744775e96d05df6b179d5e742682a42a074aa6cfaf3ce733'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
@@ -427,6 +427,15 @@ export type FieldOutputTypes = {
       readonly updateDate: CodecTypes['pg/timestamptz-string@1']['output'] | null;
       readonly listRaw: CodecTypes['pg/jsonb@1']['output'];
     };
+    readonly QuestionEmbedding: {
+      readonly questionId: CodecTypes['pg/text@1']['output'];
+      readonly model: CodecTypes['pg/text@1']['output'];
+      readonly textVariant: CodecTypes['pg/text@1']['output'];
+      readonly dim: CodecTypes['pg/int4@1']['output'];
+      readonly contentHash: CodecTypes['pg/text@1']['output'];
+      readonly vector: CodecTypes['pg/bytea@1']['output'];
+      readonly createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
+    };
     readonly QuestionHint: {
       readonly questionId: CodecTypes['pg/text@1']['output'];
       readonly level: CodecTypes['pg/int4@1']['output'];
@@ -623,6 +632,15 @@ export type FieldInputTypes = {
       readonly createDate: CodecTypes['pg/timestamptz-string@1']['input'] | null;
       readonly updateDate: CodecTypes['pg/timestamptz-string@1']['input'] | null;
       readonly listRaw: CodecTypes['pg/jsonb@1']['input'];
+    };
+    readonly QuestionEmbedding: {
+      readonly questionId: CodecTypes['pg/text@1']['input'];
+      readonly model: CodecTypes['pg/text@1']['input'];
+      readonly textVariant: CodecTypes['pg/text@1']['input'];
+      readonly dim: CodecTypes['pg/int4@1']['input'];
+      readonly contentHash: CodecTypes['pg/text@1']['input'];
+      readonly vector: CodecTypes['pg/bytea@1']['input'];
+      readonly createdAt: CodecTypes['pg/timestamptz-string@1']['input'];
     };
     readonly QuestionHint: {
       readonly questionId: CodecTypes['pg/text@1']['input'];
@@ -821,6 +839,15 @@ export type StorageColumnTypes = {
       readonly uId: CodecTypes['pg/text@1']['output'] | null;
       readonly updateDate: CodecTypes['pg/timestamptz-string@1']['output'] | null;
     };
+    readonly question_embedding: {
+      readonly contentHash: CodecTypes['pg/text@1']['output'];
+      readonly createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
+      readonly dim: CodecTypes['pg/int4@1']['output'];
+      readonly model: CodecTypes['pg/text@1']['output'];
+      readonly questionId: CodecTypes['pg/text@1']['output'];
+      readonly textVariant: CodecTypes['pg/text@1']['output'];
+      readonly vector: CodecTypes['pg/bytea@1']['output'];
+    };
     readonly question_hint: {
       readonly content: CodecTypes['pg/text@1']['output'];
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
@@ -1018,6 +1045,15 @@ export type StorageColumnInputTypes = {
       readonly uId: CodecTypes['pg/text@1']['input'] | null;
       readonly updateDate: CodecTypes['pg/timestamptz-string@1']['input'] | null;
     };
+    readonly question_embedding: {
+      readonly contentHash: CodecTypes['pg/text@1']['input'];
+      readonly createdAt: CodecTypes['pg/timestamptz-string@1']['input'];
+      readonly dim: CodecTypes['pg/int4@1']['input'];
+      readonly model: CodecTypes['pg/text@1']['input'];
+      readonly questionId: CodecTypes['pg/text@1']['input'];
+      readonly textVariant: CodecTypes['pg/text@1']['input'];
+      readonly vector: CodecTypes['pg/bytea@1']['input'];
+    };
     readonly question_hint: {
       readonly content: CodecTypes['pg/text@1']['input'];
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['input'];
@@ -1053,10 +1089,11 @@ export namespace Models {
     hasEmbeddedMathImages: CodecTypes['pg/bool@1']['output'];
     fetchedAt: CodecTypes['pg/timestamptz-string@1']['output'];
     attempts: public_Attempt[];
+    embeddings: public_QuestionEmbedding[];
     hints: public_QuestionHint[];
     placements: public_QuestionAssessment[];
     setItems: public_PracticeSetItem[];
-    readonly [RelationKeys]?: 'attempts' | 'hints' | 'placements' | 'setItems';
+    readonly [RelationKeys]?: 'attempts' | 'embeddings' | 'hints' | 'placements' | 'setItems';
   };
   export type public_QuestionAssessment = {
     assessment: CodecTypes['pg/text@1']['output'];
@@ -1077,6 +1114,17 @@ export namespace Models {
     createDate: CodecTypes['pg/timestamptz-string@1']['output'] | null;
     updateDate: CodecTypes['pg/timestamptz-string@1']['output'] | null;
     listRaw: CodecTypes['pg/jsonb@1']['output'];
+    question: public_Question;
+    readonly [RelationKeys]?: 'question';
+  };
+  export type public_QuestionEmbedding = {
+    questionId: CodecTypes['pg/text@1']['output'];
+    model: CodecTypes['pg/text@1']['output'];
+    textVariant: CodecTypes['pg/text@1']['output'];
+    dim: CodecTypes['pg/int4@1']['output'];
+    contentHash: CodecTypes['pg/text@1']['output'];
+    vector: CodecTypes['pg/bytea@1']['output'];
+    createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
     question: public_Question;
     readonly [RelationKeys]?: 'question';
   };
@@ -1269,6 +1317,7 @@ export declare const models: {
   public: {
     Question: Models.public_Question;
     QuestionAssessment: Models.public_QuestionAssessment;
+    QuestionEmbedding: Models.public_QuestionEmbedding;
     Profile: Models.public_Profile;
     PracticeSet: Models.public_PracticeSet;
     PracticeSetItem: Models.public_PracticeSetItem;
@@ -2637,6 +2686,76 @@ type ContractBase = Omit<
                 },
               ];
             };
+            readonly question_embedding: {
+              columns: {
+                readonly questionId: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly model: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly textVariant: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly dim: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                };
+                readonly contentHash: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly vector: {
+                  readonly nativeType: 'bytea';
+                  readonly codecId: 'pg/bytea@1';
+                  readonly nullable: false;
+                };
+                readonly createdAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-string@1';
+                  readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                };
+              };
+              primaryKey: { readonly columns: readonly ['questionId', 'model', 'textVariant'] };
+              uniques: readonly [];
+              indexes: readonly [
+                {
+                  readonly name: 'question_embedding_model_textVariant_idx_e3174edd';
+                  readonly prefix: 'question_embedding_model_textVariant_idx';
+                  readonly columns: readonly ['model', 'textVariant'];
+                  readonly unique: false;
+                },
+                {
+                  readonly name: 'question_embedding_questionId_idx_fdb42076';
+                  readonly prefix: 'question_embedding_questionId_idx';
+                  readonly columns: readonly ['questionId'];
+                  readonly unique: false;
+                },
+              ];
+              foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'question_embedding';
+                    readonly columns: readonly ['questionId'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'question';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+              ];
+            };
             readonly question_hint: {
               columns: {
                 readonly questionId: {
@@ -2706,6 +2825,10 @@ type ContractBase = Omit<
     readonly question_assessment: {
       readonly namespace: 'public' & NamespaceId;
       readonly model: 'QuestionAssessment';
+    };
+    readonly question_embedding: {
+      readonly namespace: 'public' & NamespaceId;
+      readonly model: 'QuestionEmbedding';
     };
     readonly profile: { readonly namespace: 'public' & NamespaceId; readonly model: 'Profile' };
     readonly practice_set: {
@@ -3902,6 +4025,17 @@ type ContractBase = Omit<
                   readonly targetFields: readonly ['questionId'];
                 };
               };
+              readonly embeddings: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'QuestionEmbedding';
+                };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['questionId'];
+                };
+              };
               readonly hints: {
                 readonly to: {
                   readonly namespace: 'public' & NamespaceId;
@@ -4082,6 +4216,68 @@ type ContractBase = Omit<
                 readonly createDate: { readonly column: 'createDate' };
                 readonly updateDate: { readonly column: 'updateDate' };
                 readonly listRaw: { readonly column: 'listRaw' };
+              };
+            };
+          };
+          readonly QuestionEmbedding: {
+            readonly fields: {
+              readonly questionId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly model: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly textVariant: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly dim: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly contentHash: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly vector: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/bytea@1' };
+              };
+              readonly createdAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-string@1';
+                };
+              };
+            };
+            readonly relations: {
+              readonly question: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'Question';
+                };
+                readonly cardinality: 'N:1';
+                readonly nullable: false;
+                readonly on: {
+                  readonly localFields: readonly ['questionId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'question_embedding';
+              readonly namespaceId: 'public';
+              readonly fields: {
+                readonly questionId: { readonly column: 'questionId' };
+                readonly model: { readonly column: 'model' };
+                readonly textVariant: { readonly column: 'textVariant' };
+                readonly dim: { readonly column: 'dim' };
+                readonly contentHash: { readonly column: 'contentHash' };
+                readonly vector: { readonly column: 'vector' };
+                readonly createdAt: { readonly column: 'createdAt' };
               };
             };
           };

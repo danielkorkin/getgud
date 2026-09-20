@@ -20,11 +20,22 @@ export interface StatsSummaryInput {
   }[];
   byDifficulty: { difficulty: "E" | "M" | "H"; correct: number; graded: number }[];
   hintImpact: { hints: "0" | "1" | "2+"; correct: number; graded: number }[];
+  /** Combined across practice sets and practice tests — a self-flagged
+   *  question is worth trusting or not regardless of which mode it came
+   *  from. See `PacingStats` in aggregate.ts. */
   markForReview: { marked: boolean; correct: number; graded: number }[];
   calculatorUsage: { used: boolean; correct: number; graded: number }[];
   referenceSheetUsage: { used: boolean; correct: number; graded: number }[];
   byTimeOfDay: { bucket: string; correct: number; graded: number }[];
   trend: { deltaPct: number; firstRate: number; lastRate: number } | null;
+  /** Skills the student answers correctly, but notably slower than their own
+   *  normal pace for that section+difficulty — a "knows it, but it costs
+   *  time" signal distinct from accuracy. See slowCorrectRate in
+   *  aggregate.ts. */
+  pacingConcerns: { skillCode: string; skillLabel: string; correctGraded: number; slowCorrectCount: number }[];
+  /** The mirror image: wrong answers that came in well under pace — a
+   *  carelessness signal rather than a knowledge gap. */
+  rushedMistakes: { skillCode: string; skillLabel: string; triedWrong: number; rushedWrongCount: number }[];
   avgActiveMsOverall: number;
   examScoreTrend: { totalScaled: number; completedAt: string }[];
   recentInsights: string[];
@@ -38,10 +49,11 @@ const SYSTEM_RULES = [
   "You are an SAT/PSAT tutor analyzing a student's full practice history to write a short performance summary and recommend targeted practice sets.",
   "Base every claim strictly on the data given — never invent a skill, score, or number not present in it.",
   "The summary must be 2-4 plain-text sentences: no markdown, no bullet lists, no LaTeX.",
-  "Recommend 1-3 practice sets, each targeting skills where the data shows real weakness (lower accuracy, and reasonable sample size) — do not recommend a skill with fewer than 3 graded questions.",
+  "Recommend 1-3 practice sets, each targeting skills where the data shows real weakness (lower accuracy) or a pacing concern (correct but notably slow, or wrong and notably rushed) with reasonable sample size — do not recommend a skill with fewer than 3 graded questions.",
   "Each recommended set's skillCodes must come only from the skill codes listed in the data below — never invent a code.",
   "The summary isn't limited to skill accuracy — if a behavioral pattern (calculator/reference-sheet usage, marking questions for review, time of day, or a recent trend) is the most notable signal in the data, lead with that instead of a generic accuracy restatement.",
   "If past coach-chat excerpts are provided, read them for recurring conceptual trouble — the same kind of confusion or misunderstanding showing up across more than one conversation, not a one-off question. List each such pattern as a short phrase (under 15 words) naming the specific confusion, e.g. \"mixes up correlation and causation in scatterplot questions\" — not a restatement of an accuracy number. Return an empty list if the excerpts don't show a repeated pattern, or if none are provided.",
+  "Pacing concerns and rushed mistakes are real weaknesses even on skills with fine accuracy — a skill the student gets right but consistently too slowly is worth a timed-drilling recommendation, and a skill where wrong answers come in unusually fast is worth flagging as a carelessness pattern, not a knowledge gap.",
 ];
 
 function formatPct(correct: number, graded: number): string {
@@ -79,6 +91,20 @@ export function buildRecommendationPrompt(input: StatsSummaryInput): { system: s
     .map((t) => `- ${t.bucket}: ${formatPct(t.correct, t.graded)} (${t.correct}/${t.graded})`)
     .join("\n");
 
+  const pacingLines =
+    input.pacingConcerns.length > 0
+      ? input.pacingConcerns
+          .map((p) => `- ${p.skillCode} (${p.skillLabel}): ${p.slowCorrectCount}/${p.correctGraded} correct answers ran well over normal pace`)
+          .join("\n")
+      : "(none)";
+
+  const rushedLines =
+    input.rushedMistakes.length > 0
+      ? input.rushedMistakes
+          .map((r) => `- ${r.skillCode} (${r.skillLabel}): ${r.rushedWrongCount}/${r.triedWrong} wrong answers came unusually fast`)
+          .join("\n")
+      : "(none)";
+
   const trendLine = input.trend
     ? `Accuracy went from ${Math.round(input.trend.firstRate * 100)}% early on to ${Math.round(input.trend.lastRate * 100)}% most recently.`
     : "(not enough history yet to show a trend)";
@@ -111,7 +137,7 @@ export function buildRecommendationPrompt(input: StatsSummaryInput): { system: s
     hintLines,
     "\nAccuracy trend over time:",
     trendLine,
-    "\nAccuracy by marked-for-review status:",
+    "\nAccuracy by marked-for-review status (practice sets and practice tests combined):",
     markForReviewLines,
     "\nAccuracy by calculator usage:",
     calculatorLines,
@@ -119,6 +145,10 @@ export function buildRecommendationPrompt(input: StatsSummaryInput): { system: s
     referenceSheetLines,
     "\nAccuracy by time of day practiced:",
     timeOfDayLines,
+    "\nPacing concerns (correct but notably slower than this student's normal pace):",
+    pacingLines,
+    "\nRushed mistakes (wrong, but notably faster than normal pace):",
+    rushedLines,
     "\nPractice test score history (out of 1600):",
     examLines,
     "\nAlready-computed observations:",

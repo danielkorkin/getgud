@@ -3,6 +3,7 @@ import { redirect, notFound } from "next/navigation";
 import { db } from "@/prisma/db";
 import { getCurrentProfile } from "@/lib/profile";
 import { domainLabel, skillLabel } from "@/lib/catalog";
+import { similarSearchAvailable } from "@/lib/query/similar-questions";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import {
   LightbulbIcon,
   EyeIcon,
   GraduationCapIcon,
+  SparkleIcon,
 } from "@phosphor-icons/react/dist/ssr";
 
 const DIFFICULTY_VARIANT = { E: "tag-green", M: "tag-yellow", H: "tag-red" } as const;
@@ -41,6 +43,7 @@ export default async function ResultsPage({ params }: PageProps<"/sets/[id]/resu
     .all();
   const attempts = await db.orm.public.Attempt.where({ setId: id }).all();
   const attemptByItemId = new Map(attempts.map((a) => [a.itemId, a]));
+  const similarEnabled = await similarSearchAvailable();
 
   const accuracy = set.gradedCount > 0 ? Math.round((set.correctCount / set.gradedCount) * 100) : null;
   const totalHints = attempts.reduce((sum, a) => sum + a.hintsUsed, 0);
@@ -153,6 +156,22 @@ export default async function ResultsPage({ params }: PageProps<"/sets/[id]/resu
                 <span className="shrink-0 font-mono text-xs text-muted-foreground">
                   {formatDuration(attempt?.activeMs ?? 0)}
                 </span>
+                {similarEnabled && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    render={
+                      <Link
+                        href={`/problems?similar=${item.questionId}&assessment=${encodeURIComponent(item.assessment)}&sections=${item.sectionCode}`}
+                        target="_blank"
+                      />
+                    }
+                    nativeButton={false}
+                  >
+                    <SparkleIcon data-icon="inline-start" />
+                    Practice similar
+                  </Button>
+                )}
               </div>
             );
           })}

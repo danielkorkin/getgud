@@ -37,9 +37,17 @@ statistics page (`/stats`) that
 aggregates every practice set and practice test into charts, rule-based
 insights, and an on-demand AI analysis that can also mine past coach
 conversations for recurring trouble and generate new targeted practice sets
-in one click. See "Practice-tool app layer" below for the data model and
-load-bearing gotchas, "Premade exams" for the exam system specifically, and
-"Statistics & AI analysis" for `/stats`.
+in one click; a third way to reach a question, a Bluebook-style browser over
+the whole bank (`/problems`) with a sticky active-set bar for hand-picking
+questions into a set; and, layered on top of that browser, an optional
+"View similar problems" (`pnpm embed` populates a per-question embedding
+table, gated off entirely when it hasn't been run) that re-ranks the same
+browser by content similarity from any question, reachable from `/problems`
+itself, the post-answer feedback in the runner, and the set results page.
+See "Practice-tool app layer" below for the data model and load-bearing
+gotchas, "Premade exams" for the exam system specifically, "Problems
+database" for the browser, "Similar problems (embeddings)" for that
+feature, and "Statistics & AI analysis" for `/stats`.
 
 ## Commands
 
@@ -60,6 +68,7 @@ pnpm scrape          # network -> data/raw/{list,question,ibn}/ (resumable)
 pnpm convert:math    # data/raw/ibn -> data/raw/vision/latex-cache.json (code only, no network/AI)
 pnpm load            # data/raw/** -> Postgres (no network; safe to re-run any time)
 pnpm db:verify       # sanity-check the loaded database
+pnpm embed           # Postgres -> per-question embeddings for "View similar problems" (needs OPENROUTER_API_KEY; optional, resumable)
 pnpm db:reset-users  # wipe every profile + practice/exam history; keeps the question bank and hint cache — dry-run by default, pass --yes to execute
 
 # Premade exam blueprints — see "Premade exams" below
@@ -93,6 +102,7 @@ pnpm scrape           # network, resumable — the only slow/network step
 pnpm convert:math     # code only, no network/AI
 pnpm load             # data/raw/ -> Postgres, no network
 pnpm db:verify        # must end with "All hard invariants passed." before continuing
+pnpm embed            # optional: needs OPENROUTER_API_KEY, enables "View similar problems"
 
 # 4. Run
 pnpm dev
@@ -217,8 +227,14 @@ rationale or chats with the coach. `Attempt.totalMs` was already tracked for
 analytics; this only had to expose it to the client and freeze the display.
 Rendering (MathML/LaTeX → KaTeX, sanitized) is `src/lib/content/render.ts` —
 see its file comment and `src/lib/content/latex-hygiene.ts` for the small,
-verified fixup pass it applies before handing LaTeX to KaTeX. Question
-generation/sampling is `src/lib/query/generate-set.ts`.
+verified fixup pass it applies before handing LaTeX to KaTeX. `render.ts`
+also runs a `wrapTables` pass after DOMPurify that wraps any `<table>` in a
+stimulus/stem (real College Board markup — DOMPurify already lets it
+through, nothing generates it) in a `.qbank-table-wrap` scroll container and
+strips the legacy `border` attribute, so a wide data table doesn't overflow
+a narrow runner pane or double up borders with the `.qbank-table-wrap` rules
+in `globals.css`. Question generation/sampling is
+`src/lib/query/generate-set.ts`.
 
 **`Attempt.id` always equals its `PracticeSetItem.id`, by convention, not a
 schema constraint.** `.upsert()` on this ORM conflict-targets the row's
@@ -510,6 +526,173 @@ repeat. Follow it in order — each step depends on the last:
    `RESERVED_QUESTION_IDS` picked up the new exam without you touching
    `generate-set.ts`.
 
+## Problems database (`/problems`)
+
+A third way to reach a question, alongside `/new`'s random sampling and
+`/tests`'s premade blueprints: a Bluebook-style browser over the whole
+College Board bank — filter/sort by every facet, expand any row to read the
+full stimulus/stem/choices, and reveal the correct answer + rationale only
+behind an explicit **Show answer** click. A sticky active-set bar lets you
+create an empty `PracticeSet` and add hand-picked questions to it as you
+browse, then run it through the existing runner.
+
+Same tables, no schema change — a hand-picked set is `PracticeSet` with
+`mode: 'practice'` and `config: { kind: "manual" }` (a second non-`SetFilters`
+shape in that Jsonb column, alongside `exams.ts`'s `{ examId }`), and
+`src/app/problems/page.tsx` finds a profile's own drafts by filtering on
+that discriminator client-side (the ORM lane can't query into Jsonb). Query
+layer is `src/lib/query/browse-filters.ts` (pure filter type + URL parsing/
+serialization — deliberately **not** `server-only`, because the client
+filter panel calls `parseBrowseParams`/`browseParamsToQuery` at runtime, not
+just for their types) and its sibling `src/lib/query/browse-questions.ts`
+(the actual DB queries, `server-only`). New Server Actions live alongside
+the existing ones in `src/actions/sets.ts`: `createEmptySet`,
+`addQuestionsToSet`, `removeQuestionFromSet`.
+
+**Two filters `/new`'s `generate-set.ts` applies are deliberately NOT
+inherited here, by product decision — don't "fix" this back into parity:**
+questions reserved for a premade exam (`RESERVED_QUESTION_IDS`) are fully
+browsable, revealable, and addable on `/problems`, and a question with no
+published answer is shown too (flagged "No answer on file," with both its
+Add button and its bulk-select checkbox disabled — `addQuestionsToSet`
+rejects a whole batch containing one). `/new` keeps both filters unchanged;
+`browse-questions.ts` has its own copy of the WHERE clause rather than
+sharing `generate-set.ts`'s `buildWhereFragment`, specifically so a future
+edit to one can't silently change the other.
+
+**Every hand-picked item append is append-only — never inserted
+mid-sequence.** `addQuestionsToSet` writes new `PracticeSetItem` rows at
+`maxPosition + 1 + i`; existing `Attempt` rows key off item id and
+`@@unique([setId, position])` would collide with anything else.
+`removeQuestionFromSet` (only permitted while the set has zero answered
+attempts) deletes one row, then renumbers the survivors to `0..n-1` in
+**ascending** position order specifically — every position only ever
+decreases, so each target slot was already vacated by the deletion or a
+prior loop iteration, and the unique constraint never trips mid-renumber.
+
+**`question_assessment`'s PK is `(assessment, questionId)`** — same reason
+`generate-set.ts` pins a single assessment per query — so `browseQuestions`
+forces the filter panel's assessment to match whatever set is active
+(`?set=<id>`) rather than letting them drift independently; otherwise an
+added item could snapshot a different assessment's difficulty than the one
+the browser was showing.
+
+Sorting is a **param-driven `CASE`, not an interpolated `ORDER BY <column>`**
+— `db.raw.sql`'s `${}` is always a bind parameter, never an identifier. The
+default "skill" sort prefixes by `qa.section` before `domainCode`/
+`skillCode`, because domain codes alone sort alphabetically (CAS, EOI, H,
+INI, P, Q, S…), which interleaves Reading/Writing and Math domains.
+
+An empty hand-picked draft (`questionCount: 0`) has no items, so
+`/sets/[id]`'s `Math.min(currentIndex, questionCount - 1)` would be `-1` —
+that page redirects a zero-item set straight back to `/problems?set=<id>`
+rather than rendering a broken runner; `/sets`' library list shows the same
+draft with a "Draft" badge linking there instead of into the runner.
+
+## Similar problems (embeddings)
+
+A fourth way to reach a question, layered onto `/problems` rather than a new
+page: **"View similar problems"** opens `/problems?similar=<questionId>` —
+the existing browser, re-ranked by embedding cosine similarity to that
+question, with every filter, the answer reveal, the active-set bar, and "Add
+to set" working unchanged. Entry points: an expanded row's footer on
+`/problems` (`problem-row.tsx`), the post-answer feedback card in the
+practice runner (`practice-runner.tsx` — **post-answer and practice-mode
+only**, never in `exam-runner.tsx`, which is a fully separate component and
+carries no similar-search code at all — a near-duplicate's rationale would
+spoil the answer if this appeared pre-submit), and a "Practice similar" link
+per row on `/sets/[id]/results`.
+
+**Model/text choice is empirically justified by a sibling project, not
+guessed.** `../../other/or-emb` (not a runtime dependency — a separate
+checkout) swept 33 OpenRouter embedding models × 3 text variants against
+this exact 3,767-question bank and found `google/gemini-embedding-2` on the
+`full` variant (stimulus + stem + answer options concatenated) wins on every
+axis (domain/skill/style separation). See its README for the full
+methodology. **Its cached vectors are deliberately not imported**, though:
+it embeds text extracted from the *raw* scraped HTML via its own extractor
+(math renders as College Board's spoken-form alt text), which differs from
+this app's own canonical Postgres columns (`pnpm convert:math` already
+resolved saic equations to real LaTeX) — the two would occupy different
+vector spaces and can't be mixed. `pnpm embed` (`scripts/embed-questions.ts`)
+embeds fresh from `Question.{stimulus,stem,answerOptions}` instead — a fifth,
+optional pipeline stage (see `scripts/README.md`), reading Postgres rather
+than `data/`, requiring `OPENROUTER_API_KEY`, costing about $0.15–0.20 for
+the whole bank, and resumable the same way `pnpm scrape` is (skips any
+question whose stored embedding's `contentHash` still matches).
+
+**Storage: `Bytes` (bytea), not pgvector.** `QuestionEmbedding` (contract.prisma)
+stores each vector as raw little-endian float32 bytes, L2-normalized on
+write so cosine similarity is a plain dot product at query time — never
+assume a provider already returns unit vectors (verified: most do, some
+don't, e.g. `perplexity/pplx-embed-v1-4b` returns norms ~9.7–16.6 in
+or-emb's benchmark). pgvector was deliberately skipped: this machine's
+Postgres has no `vector` extension available (`pg_available_extensions`),
+adding it would mean a new brew/apt step in the from-scratch README for
+every self-hoster, and at 3072 dims it would exceed pgvector's HNSW/IVFFlat
+index dimension cap anyway (exact-scan territory either way at this
+corpus's size). Keyed by `(questionId, model, textVariant)` rather than
+`questionId` alone, so switching embedding models later is additive — old
+and new vectors can coexist — not a wipe-and-redo.
+
+**Retrieval is a brute-force in-process index, not a DB-side ANN query.**
+`src/lib/embeddings/core.ts` is pure (no `server-only`, no `@/prisma/db`
+import) and holds the text builder, the OpenRouter embedding-model
+constructor, and `EmbeddingIndex` — a flat `Float32Array` (all ~3,767 rows ×
+3072 dims ≈ 46MB) plus a cosine top-K scan. `src/lib/query/similar-questions.ts`
+is the `server-only` I/O wrapper: it loads `QuestionEmbedding` rows via the
+ORM (not `db.raw.sql` — `Bytes` decodes natively through the ORM lane, same
+reason `browseQuestions` reads content columns through the ORM after its
+raw-SQL facet query) and caches the built index on `globalThis`, for the
+same Turbopack-per-entrypoint-bundle reason `db.ts` caches `db`/`param` (see
+"Practice-tool app layer" above) — **unconditionally**, not gated on
+`NODE_ENV`, since that guard exists in `db.ts` to survive Fast Refresh, and
+copying it here would reload 46MB per request under `next start`. An empty
+index is deliberately never cached, so a dev server already running when
+`pnpm embed` populates the table for the first time picks the rows up on
+its own on the next request — no restart needed. A restart **is** needed
+after re-running `pnpm embed` against a database that already had rows,
+since the cached index doesn't know to invalidate itself.
+
+**Why `core.ts` must never import from `hint-provider.ts`.** `hint-provider.ts`
+starts with `import "server-only"`, whose package resolves the plain
+`"default"` export condition (i.e., anything that isn't Next's
+`react-server` bundler condition — which includes `tsx`) to a module that
+unconditionally throws. `scripts/embed-questions.ts` runs under plain `tsx`,
+so importing anything that transitively pulls in `server-only` crashes on
+load. `core.ts` builds its own `createOpenRouter({ apiKey })` rather than
+reusing `hint-provider.ts`'s.
+
+**`(sectionCode, assessment)` are pinned into every "View similar" href as
+plain, user-adjustable filter chips**, not hidden query state — landing on
+`/problems?similar=<id>&assessment=<A>&sections=<S>` sets those two filters
+to the source question's own section/assessment but leaves domain/skill/
+difficulty/etc. at "all," so a student can loosen or tighten from there like
+any other browse session. `sort` defaults to a new `"similarity"` value
+(ranked by `array_position` into the id list `rankSimilar()` returns) when
+`?similar=` is present and no explicit `sort` was given, and
+`parseBrowseParams` coerces `sort=similarity` back to `"skill"` whenever
+`similarTo` is empty — otherwise `array_position` against an empty array
+returns NULL for every row and the sort would silently degrade to the
+`q.id` tiebreaker.
+
+**Near-duplicate (same-template) questions are shown, not filtered, and
+labeled.** College Board's own `templateClusterId`/`parentTemplateId`
+grouping (same fields `scripts/design-exam.ts` treats as duplicates) will
+put a question's own re-skinned siblings at the very top of its similarity
+ranking, by construction — that's genuinely useful drilling, so
+`problem-row.tsx` shows a "Same template" badge instead of hiding them.
+Similarity is surfaced as a **rank** ("#3 most similar"), never a raw cosine
+percentage — Gemini-embedding cosine values cluster in the ~0.6–0.9 band
+regardless of how similar two questions actually are, so a raw score reads
+as noise.
+
+**Reserved/ungradable questions inherit `/problems`' own policy, not
+`/new`'s** — a similar-mode result set is still `browseQuestions` under the
+hood, so exam-reserved and no-published-answer questions remain browsable
+here exactly as they are in plain browse mode; see "Problems database"
+above.
+
 ## Learn section (resources + guides)
 
 The site is split into two halves: **Practice** (`/new`, `/sets`, `/tests`
@@ -670,6 +853,92 @@ indistinguishable from "no data for this category at all."
 "practice" | "stats"` — `/stats` is its own top-level header pill (not
 nested under Practice), with a single-item `links` sub-row ("Overview") for
 consistency with how `Learn`'s pill also carries an "Overview" sub-link.
+
+**Pacing analysis — "correct but slow" and "wrong but rushed" — is a
+separate signal from plain accuracy or the student's own manual
+mark-for-review flag, and it is the one part of `/stats` deliberately
+computed across *both* practice sets and practice tests**, added in
+`aggregate.ts`'s `pacingEligible` / `computePacingBaseline` /
+`slowCorrectQuestions` / `pacingBySkill` / `pacingByDomain`, and exposed as
+its own top-level `StatsBundle.pacing: PacingStats | null` — a sibling of
+`practice`/`exam`, not nested inside either. "Slow" is always relative to
+the student's *own* median time on their other eligible correct answers,
+bucketed by `sectionCode:difficulty` (RW vs Math and easy vs hard questions
+have very different normal paces) — never a fixed number of seconds. A
+bucket needs `>=5` samples to be trusted (`PACING_MIN_BASELINE_SAMPLES`);
+thinner buckets fall back to a section-wide median, then an overall median
+(itself only trusted past that same sample floor, never computed from a
+couple of data points).
+
+**Why this crosses the practice/exam boundary when nothing else in this
+file does.** "Practice-mode and exam-mode stats are never blended" (below)
+is about not averaging two *different units* — a practice accuracy
+percentage and a 200–800 scaled score. Pacing isn't either of those: it's a
+per-question fact (`isCorrect`, `markedForReview`, time-on-question) that
+means exactly the same thing regardless of which mode produced it, so
+computing it over `input.attempts` unfiltered by mode is a strictly more
+complete answer to "which past questions are worth another look," not an
+apples-to-oranges blend. This is also why `pacingEligible`'s hint/reveal
+exclusions need no exam-specific carve-out: exam-mode sets close
+`/api/hint` and `/api/coach` via `getOwnedItem`'s default `'practice-only'`
+policy (see "Premade exams" below), so an exam attempt already has
+`hintsUsed === 0` and `answerRevealed === false` by construction — it
+satisfies `pacingEligible` the same way an unaided practice attempt does,
+with no special-casing needed. `pacing.markForReview` (a combined version
+of the existing `markForReviewImpact`) lives here for the same reason;
+`PracticeStats.markForReview` still exists separately, scoped to practice
+sets only, feeding the Practice tab's own tile.
+
+**Uses `Attempt.totalMs`, not `activeMs`, and this is load-bearing, not a
+style choice.** `activeMs` keeps accumulating after the question is
+answered — it's only paused on tab-hidden/blur, never on submit (see
+`practice-runner.tsx`'s `activeTrackerRef`, untouched by `handleSubmit`) —
+so it silently absorbs the time spent reading the rationale and chatting
+with Strobi afterward, which this app actively encourages as a core
+feature. A question a student nailed instantly but then discussed with the
+coach for three minutes would misreport as "slow." `totalMs`, by contrast,
+is exactly the value `live-timer.tsx` freezes at the instant of submission
+(`now - firstViewedAt`, recomputed server-side in `submitAnswer`) — it
+never includes anything that happens after. The tradeoff is that `totalMs`
+is wall-clock, not focus-time, so a backgrounded/left-open tab can put a
+single attempt at tens of minutes with nothing to do with actual struggle;
+`pacingEligible` drops any attempt over `PACING_CEILING_MS` (10 minutes)
+from both the baseline and eligibility for flagging, rather than letting
+one outlier dominate the "worst offenders" list or skew a bucket's median.
+`pacingEligible` also excludes hinted attempts (`hintsUsed > 0`) entirely —
+hint time isn't the student's own unaided pace, and hint usage already has
+its own dedicated `hintImpact`/hint-impact-insight treatment — and excludes
+revealed answers (giving up isn't a pacing failure).
+
+A correct answer counts as "slow" only past both a relative floor (`>=1.6x`
+its baseline, `SLOW_CORRECT_RATIO`) and an absolute one (`>=60s`,
+`SLOW_CORRECT_FLOOR_MS`) — the absolute floor exists because a 10s baseline
+makes even a 16s answer technically "1.6x," which isn't what anyone means
+by "took a long time." A wrong answer counts as "rushed" at `<=0.5x`
+baseline (`RUSHED_WRONG_RATIO`).
+
+This feeds four places, and all four must stay in sync if the thresholds
+or eligibility rules change: the `pacing-risk`/`rushed-mistakes`/combined
+`mark-for-review` insights in `insights.ts` — computed in their own
+`if (pacing)` block ahead of the practice-only rules specifically so
+`pacingConcern` is in scope for the existing `slow-skill` rule to skip
+whatever skill `pacing-risk` already flagged (the two would otherwise say
+almost the same thing about the same skill), each with its own
+skill-level sample-size guard like every other rule there; `stats-client.tsx`'s
+mode-agnostic "Pacing" section (rendered above the Practice/Practice Tests
+tabs, not inside either one) holding the combined mark-for-review tile, the
+"Slow-but-correct rate by domain" chart, and `SlowCorrectTable`'s
+per-question list (each row links to `/sets/[id]/results`, which redirects
+to `/tests/[id]/results` on its own when the row's origin was a practice
+test — see the "Premade exams" section — so the link never needs to branch
+on mode; that page has no per-item anchor to jump straight to one question
+either, so the row shows mode/skill/difficulty/date to narrow it down
+instead); and `pacingConcerns`/`rushedMistakes`/the now-combined
+`markForReview` in `stats-prompt.ts`'s `StatsSummaryInput` (populated in
+`src/actions/stats.ts` from `bundle.pacing`, filtered to non-zero counts so
+the prompt isn't padded with skills showing no pattern) so the AI analysis
+can recommend a timed-drilling set for a skill that's accurate but slow,
+not just an inaccurate one.
 
 ## Repo layout notes
 

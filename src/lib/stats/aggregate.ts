@@ -310,6 +310,219 @@ export function markForReviewImpact(attempts: AttemptStatsRow[]): MarkForReviewR
   });
 }
 
+const PACING_MIN_BASELINE_SAMPLES = 5;
+const SLOW_CORRECT_RATIO = 1.6;
+// A 10s baseline makes a 16s answer technically "1.6x," which isn't what
+// anyone means by "took a long time" — this absolute floor keeps the signal
+// meaningful regardless of how fast a bucket's baseline happens to be.
+const SLOW_CORRECT_FLOOR_MS = 60_000;
+const RUSHED_WRONG_RATIO = 0.5;
+// A tab left open (or backgrounded overnight) can put `totalMs` in the tens
+// of minutes without the student having actually sat there stuck — past
+// this ceiling there's no way to tell "genuinely slow" from "walked away,"
+// so these attempts are dropped from the baseline *and* from ever
+// qualifying as slow, rather than dominating the flagged list.
+const PACING_CEILING_MS = 10 * 60_000;
+
+interface PacingBaseline {
+  byBucket: Map<string, number>; // `${sectionCode}:${difficulty}` -> median ms
+  bySection: Map<string, number>; // sectionCode -> median ms
+  overallMs: number;
+}
+
+function pacingBucketKey(sectionCode: string, difficulty: string): string {
+  return `${sectionCode}:${difficulty}`;
+}
+
+/** The population pacing is judged over: graded, correct, not revealed, no
+ *  hint used, and under the tab-left-open ceiling. `totalMs` (not
+ *  `activeMs`) is the right field here — per live-timer.tsx / CLAUDE.md it's
+ *  the value that freezes the instant a question is answered, so unlike
+ *  `activeMs` (which keeps accumulating through the post-answer rationale
+ *  and coach chat, a core feature of this app) it never gets inflated by
+ *  what the student does *after* getting the question right. A hint pads
+ *  the time it took in a way that has nothing to do with the student's own
+ *  pace, so hinted answers are excluded from both the baseline and the
+ *  signal itself — `hintImpact`/the hint-impact insight already covers
+ *  hint usage on its own terms. */
+function pacingEligible(a: AttemptStatsRow): boolean {
+  return isGraded(a) && !a.answerRevealed && a.hintsUsed === 0 && a.totalMs > 0 && a.totalMs <= PACING_CEILING_MS;
+}
+
+/** "Slow" only means something relative to how a given student paces
+ *  normally, so the baseline is always the student's own median time on
+ *  their *other* eligible correct answers — never a fixed number of
+ *  seconds. Bucketed by section+difficulty (RW and Math, and easy vs hard
+ *  questions, have very different normal paces); falls back to a
+ *  section-wide median, then an overall median, whenever a bucket is too
+ *  thin (<5 samples) to trust — and the overall fallback itself is only
+ *  trusted past that same sample floor, rather than ever letting a
+ *  near-empty history produce a baseline from a couple of data points. */
+function computePacingBaseline(attempts: AttemptStatsRow[]): PacingBaseline {
+  const correct = attempts.filter(pacingEligible).filter((a) => a.isCorrect);
+  const bucketSamples = new Map<string, number[]>();
+  const sectionSamples = new Map<string, number[]>();
+  const all: number[] = [];
+  for (const a of correct) {
+    all.push(a.totalMs);
+    const bucketKey = pacingBucketKey(a.sectionCode, a.difficulty);
+    (bucketSamples.get(bucketKey) ?? bucketSamples.set(bucketKey, []).get(bucketKey)!).push(a.totalMs);
+    (sectionSamples.get(a.sectionCode) ?? sectionSamples.set(a.sectionCode, []).get(a.sectionCode)!).push(a.totalMs);
+  }
+  const byBucket = new Map<string, number>();
+  for (const [key, samples] of bucketSamples) if (samples.length >= PACING_MIN_BASELINE_SAMPLES) byBucket.set(key, median(samples));
+  const bySection = new Map<string, number>();
+  for (const [key, samples] of sectionSamples) if (samples.length >= PACING_MIN_BASELINE_SAMPLES) bySection.set(key, median(samples));
+  return { byBucket, bySection, overallMs: all.length >= PACING_MIN_BASELINE_SAMPLES ? median(all) : 0 };
+}
+
+function pacingBaselineFor(baseline: PacingBaseline, a: AttemptStatsRow): number {
+  return baseline.byBucket.get(pacingBucketKey(a.sectionCode, a.difficulty)) ?? baseline.bySection.get(a.sectionCode) ?? baseline.overallMs;
+}
+
+export interface SlowCorrectQuestion {
+  attemptId: string;
+  setId: string;
+  setName: string;
+  mode: "practice" | "exam";
+  skillCode: string;
+  skillLabel: string;
+  domainCode: string;
+  domainLabel: string;
+  sectionCode: string;
+  difficulty: string;
+  totalMs: number;
+  baselineMs: number;
+  ratio: number;
+  submittedAt: string;
+}
+
+/** Correct answers that took notably longer than this student's own normal
+ *  pace — the "you got it right, but it cost you time" signal a plain
+ *  accuracy view misses. Deliberately computed across *both* practice sets
+ *  and practice tests (unlike the rest of `PracticeStats`, which is
+ *  practice-only) — a question worth reviewing because of how long it took
+ *  is worth reviewing regardless of which mode surfaced it; see
+ *  `PacingStats`'s comment for why this doesn't run into the
+ *  practice-vs-exam blending problem the rest of the file avoids. A
+ *  question qualifies only past both a relative floor (>=1.6x its baseline)
+ *  and an absolute one (>=60s); see `pacingEligible` for what's excluded
+ *  (reveals, hinted answers, and implausibly long tab-left-open attempts)
+ *  and why. Capped and sorted by how far over pace each one ran, worst
+ *  first. */
+export function slowCorrectQuestions(
+  attempts: AttemptStatsRow[],
+  setNameById: Map<string, string>,
+  modeBySetId: Map<string, string>,
+): SlowCorrectQuestion[] {
+  const baseline = computePacingBaseline(attempts);
+  return attempts
+    .filter((a) => pacingEligible(a) && a.isCorrect && a.submittedAt)
+    .map((a) => ({ a, baselineMs: pacingBaselineFor(baseline, a) }))
+    .filter(({ a, baselineMs }) => baselineMs > 0 && a.totalMs >= SLOW_CORRECT_FLOOR_MS && a.totalMs / baselineMs >= SLOW_CORRECT_RATIO)
+    .map(({ a, baselineMs }) => ({
+      attemptId: a.id,
+      setId: a.setId,
+      setName: setNameById.get(a.setId) ?? "Practice set",
+      mode: modeBySetId.get(a.setId) === "exam" ? ("exam" as const) : ("practice" as const),
+      skillCode: a.skillCode,
+      skillLabel: skillLabel(a.skillCode),
+      domainCode: a.domainCode,
+      domainLabel: domainLabel(a.domainCode),
+      sectionCode: a.sectionCode,
+      difficulty: a.difficulty,
+      totalMs: a.totalMs,
+      baselineMs,
+      ratio: a.totalMs / baselineMs,
+      submittedAt: a.submittedAt!,
+    }))
+    .sort((x, y) => y.ratio - x.ratio)
+    .slice(0, 25);
+}
+
+export interface PacingSkillRow {
+  skillCode: string;
+  skillLabel: string;
+  domainCode: string;
+  domainLabel: string;
+  sectionCode: string;
+  correctGraded: number;
+  slowCorrectCount: number;
+  slowCorrectRate: number;
+  triedWrong: number;
+  rushedWrongCount: number;
+  rushedWrongRate: number;
+}
+
+/** Per-skill rollup of the same pacing signal, plus its mirror image:
+ *  "rushed wrong" answers that came in well *under* baseline on a question
+ *  the student actually attempted unaided (see `pacingEligible` — same
+ *  exclusions apply to the wrong side too, so a hinted-and-still-wrong
+ *  answer never counts as "rushed"). Two different failure modes with the
+ *  same cause worth catching together: not respecting how long a question
+ *  actually needs. */
+export function pacingBySkill(attempts: AttemptStatsRow[]): PacingSkillRow[] {
+  const baseline = computePacingBaseline(attempts);
+  const map = new Map<
+    string,
+    { domainCode: string; sectionCode: string; correctGraded: number; slowCorrectCount: number; triedWrong: number; rushedWrongCount: number }
+  >();
+  for (const a of attempts.filter(pacingEligible)) {
+    const entry = map.get(a.skillCode) ?? {
+      domainCode: a.domainCode,
+      sectionCode: a.sectionCode,
+      correctGraded: 0,
+      slowCorrectCount: 0,
+      triedWrong: 0,
+      rushedWrongCount: 0,
+    };
+    const baselineMs = pacingBaselineFor(baseline, a);
+    if (a.isCorrect) {
+      entry.correctGraded += 1;
+      if (baselineMs > 0 && a.totalMs >= SLOW_CORRECT_FLOOR_MS && a.totalMs / baselineMs >= SLOW_CORRECT_RATIO) entry.slowCorrectCount += 1;
+    } else {
+      entry.triedWrong += 1;
+      if (baselineMs > 0 && a.totalMs / baselineMs <= RUSHED_WRONG_RATIO) entry.rushedWrongCount += 1;
+    }
+    map.set(a.skillCode, entry);
+  }
+  return [...map.entries()].map(([skillCode, v]) => ({
+    skillCode,
+    skillLabel: skillLabel(skillCode),
+    domainCode: v.domainCode,
+    domainLabel: domainLabel(v.domainCode),
+    sectionCode: v.sectionCode,
+    correctGraded: v.correctGraded,
+    slowCorrectCount: v.slowCorrectCount,
+    slowCorrectRate: pct(v.slowCorrectCount, v.correctGraded),
+    triedWrong: v.triedWrong,
+    rushedWrongCount: v.rushedWrongCount,
+    rushedWrongRate: pct(v.rushedWrongCount, v.triedWrong),
+  }));
+}
+
+export interface PacingDomainRow {
+  domainCode: string;
+  domainLabel: string;
+  sectionCode: string;
+  correctGraded: number;
+  slowCorrectCount: number;
+  slowCorrectRate: number;
+}
+
+export function pacingByDomain(skills: PacingSkillRow[]): PacingDomainRow[] {
+  const map = new Map<string, { sectionCode: string; correctGraded: number; slowCorrectCount: number }>();
+  for (const s of skills) {
+    const entry = map.get(s.domainCode) ?? { sectionCode: s.sectionCode, correctGraded: 0, slowCorrectCount: 0 };
+    entry.correctGraded += s.correctGraded;
+    entry.slowCorrectCount += s.slowCorrectCount;
+    map.set(s.domainCode, entry);
+  }
+  return [...map.entries()]
+    .map(([domainCode, v]) => ({ domainCode, domainLabel: domainLabel(domainCode), ...v, slowCorrectRate: pct(v.slowCorrectCount, v.correctGraded) }))
+    .sort((a, b) => b.slowCorrectRate - a.slowCorrectRate);
+}
+
 export interface ToolUsageRow {
   used: boolean;
   correct: number;
@@ -489,6 +702,25 @@ export interface ExamStats {
   latest: ExamScorePoint | null;
 }
 
+/** Everything about "which specific past questions are worth another look"
+ *  — pacing and the mark-for-review flag's actual effectiveness — computed
+ *  across *both* practice sets and practice tests, unlike `PracticeStats`
+ *  (practice-only) and `ExamStats` (exam-only). Those two stay split
+ *  because a practice accuracy percentage and an exam's scaled score are
+ *  different units that would mislead if averaged together; nothing here
+ *  is a mode-specific unit like that; `isCorrect`/`markedForReview`/time-on-
+ *  question mean the same thing in both modes (see `pacingEligible`'s
+ *  comment on why exam attempts, which can't use hints or reveal, already
+ *  satisfy that filter naturally), so combining them is a strictly more
+ *  complete answer to "which questions gave this student trouble" instead
+ *  of an apples-to-oranges blend. */
+export interface PacingStats {
+  bySkill: PacingSkillRow[];
+  byDomain: PacingDomainRow[];
+  slowCorrectQuestions: SlowCorrectQuestion[];
+  markForReview: MarkForReviewRow[];
+}
+
 export interface Insight {
   id: string;
   severity: "info" | "notice" | "opportunity";
@@ -500,6 +732,7 @@ export interface StatsBundle {
   headline: HeadlineTiles;
   practice: PracticeStats | null;
   exam: ExamStats | null;
+  pacing: PacingStats | null;
 }
 
 export function buildStatsBundle(input: {
@@ -509,6 +742,7 @@ export function buildStatsBundle(input: {
   examName: (examId: string) => string;
 }): StatsBundle {
   const modeBySetId = new Map(input.sets.map((s) => [s.id, s.mode]));
+  const setNameById = new Map(input.sets.map((s) => [s.id, s.name]));
   const practiceAttempts = input.attempts.filter((a) => modeBySetId.get(a.setId) === "practice");
 
   const practiceGraded = practiceAttempts.filter(isGraded);
@@ -539,6 +773,19 @@ export function buildStatsBundle(input: {
   const exam: ExamStats | null = scoreTrend.length === 0 ? null : { scoreTrend, latest: scoreTrend[scoreTrend.length - 1] };
 
   const allGraded = input.attempts.filter(isGraded);
+
+  // Combined across both modes — see `PacingStats`'s comment for why that's
+  // the right scope here even though `practice`/`exam` above stay split.
+  const pacingSkills = pacingBySkill(input.attempts);
+  const pacing: PacingStats | null =
+    allGraded.length === 0
+      ? null
+      : {
+          bySkill: pacingSkills,
+          byDomain: pacingByDomain(pacingSkills),
+          slowCorrectQuestions: slowCorrectQuestions(input.attempts, setNameById, modeBySetId),
+          markForReview: markForReviewImpact(input.attempts),
+        };
   const headline: HeadlineTiles = {
     totalQuestionsAnswered: input.attempts.filter((a) => a.submittedAt).length,
     overallAccuracy: allGraded.length > 0 ? pct(allGraded.filter((a) => a.isCorrect).length, allGraded.length) : null,
@@ -550,5 +797,5 @@ export function buildStatsBundle(input: {
     latestExamTotalScaled: exam?.latest?.totalScaled ?? null,
   };
 
-  return { headline, practice, exam };
+  return { headline, practice, exam, pacing };
 }

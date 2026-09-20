@@ -1,7 +1,8 @@
 # College Board question bank pipeline
 
-Four independent stages. Each reads only what the previous one wrote to
-disk — nothing re-fetches over the network unless you explicitly re-run
+Four independent stages (plus a fifth, `embed`, layered on top for "View
+similar problems" — see below). Each reads only what the previous one wrote
+to disk — nothing re-fetches over the network unless you explicitly re-run
 `scrape`, and `load`/`db:verify` never touch the network at all.
 
 ```
@@ -22,6 +23,38 @@ Only re-run `pnpm scrape` if you want fresher data from College Board, and
 only re-run `pnpm convert:math` after editing
 `data/raw/vision/manual-overrides.json` or improving
 `scripts/lib/spoken-math.ts`.
+
+## Stage 5: embeddings for "View similar problems" (`pnpm embed`)
+
+`pnpm embed` (`scripts/embed-questions.ts`) is a fifth stage, separate from
+the four above in one important way: it reads **Postgres**, not `data/` — run
+it any time after `pnpm load` (and again after any `pnpm load`/`load:upsert`
+re-run that changes question content). Requires `OPENROUTER_API_KEY` in
+`.env`; embedding all ~3,767 questions costs about $0.15–0.20 with the
+default model (`google/gemini-embedding-2`) and takes a few minutes.
+
+Resumable and idempotent like the rest of the pipeline: a question is
+skipped once it already has a stored embedding whose `contentHash` matches
+the current row, so a re-run after `load:upsert` only re-embeds what
+actually changed. `--dry-run` prints the question/token/cost estimate
+without calling the API or writing anything; `--limit=N` caps how many get
+embedded; `--force` re-embeds everything regardless of `contentHash`.
+
+Without `OPENROUTER_API_KEY` set, `pnpm embed` simply isn't runnable (same
+posture as the hint/coach features) — the app works fine without it, it
+just means "View similar problems" doesn't appear anywhere in the UI
+(`similarSearchAvailable()` in `src/lib/query/similar-questions.ts` gates it
+off whenever `question_embedding` is empty). See CLAUDE.md's "Similar
+problems" note for the model/text-variant choice and why it isn't shared
+with the sibling `or-emb` benchmark project's own cached vectors.
+
+**Restart `pnpm dev` after re-running `pnpm embed` against a DB that already
+had embeddings** — the similarity index is loaded once and cached in process
+memory (`src/lib/query/similar-questions.ts`); a dev server already running
+when you add or update embeddings won't see the change until restarted. The
+very first `pnpm embed` (on a database with no `question_embedding` rows
+yet) needs no restart — an empty index is deliberately never cached, so the
+next request after the run picks the new rows up on its own.
 
 ## Resetting user data without re-running the pipeline
 

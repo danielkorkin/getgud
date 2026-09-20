@@ -12,6 +12,7 @@ import { SkillProgressList } from "@/components/stats/skill-progress-list";
 import { RateBarChart, type RateBarDatum } from "@/components/stats/rate-bar-chart";
 import { DifficultyBarChart } from "@/components/stats/difficulty-bar-chart";
 import { StatTilePair } from "@/components/stats/stat-tile-pair";
+import { SlowCorrectTable } from "@/components/stats/slow-correct-table";
 import { VolumeHeatmap } from "@/components/stats/volume-heatmap";
 import { ExamScoreChart } from "@/components/stats/exam-score-chart";
 import { AnalysisPanel } from "@/components/stats/analysis-panel";
@@ -25,7 +26,7 @@ function domainData(domains: DomainRow[], sectionCode: "RW" | "MATH"): RateBarDa
 }
 
 export function StatsClient({ bundle, insights }: { bundle: StatsBundle; insights: Insight[] }) {
-  if (!bundle.practice && !bundle.exam) {
+  if (!bundle.practice && !bundle.exam && !bundle.pacing) {
     return (
       <Empty>
         <EmptyHeader>
@@ -45,9 +46,15 @@ export function StatsClient({ bundle, insights }: { bundle: StatsBundle; insight
     );
   }
 
-  const practiceInsights = insights.filter((i) => i.id !== "exam-trend");
+  // Pacing insights (pacing-risk / rushed-mistakes are dynamic-id, mark-for-review
+  // is static) are combined across modes — see `PacingStats` in aggregate.ts —
+  // so they get their own mode-agnostic section instead of either tab's list.
+  const isPacingInsight = (i: Insight) => i.id.startsWith("pacing-risk") || i.id.startsWith("rushed-mistakes") || i.id === "mark-for-review";
+  const practiceInsights = insights.filter((i) => i.id !== "exam-trend" && !isPacingInsight(i));
   const examInsights = insights.filter((i) => i.id === "exam-trend");
+  const pacingInsights = insights.filter(isPacingInsight);
   const p = bundle.practice;
+  const pacing = bundle.pacing;
 
   return (
     <div className="flex flex-col gap-8">
@@ -64,6 +71,30 @@ export function StatsClient({ bundle, insights }: { bundle: StatsBundle; insight
           value={bundle.headline.latestExamTotalScaled != null ? `${bundle.headline.latestExamTotalScaled}/1600` : "—"}
         />
       </div>
+
+      {pacing && (
+        <section className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-xl font-medium tracking-tight">Pacing</h2>
+            <p className="text-sm text-muted-foreground">
+              Combined across practice sets and practice tests — the questions worth another look, regardless of
+              where you saw them.
+            </p>
+          </div>
+          <InsightList insights={pacingInsights} />
+          <StatTilePair
+            a={{ label: "Not marked for review", rate: pacing.markForReview[0].rate, graded: pacing.markForReview[0].graded }}
+            b={{ label: "Marked for review", rate: pacing.markForReview[1].rate, graded: pacing.markForReview[1].graded }}
+          />
+          <RateBarChart
+            title="Slow-but-correct rate by domain"
+            description="Share of correct answers in each domain that ran well over your normal pace for that difficulty."
+            data={pacing.byDomain.map((d) => ({ key: d.domainCode, label: d.domainLabel, rate: d.slowCorrectRate, graded: d.correctGraded }))}
+            color="var(--chart-2)"
+          />
+          <SlowCorrectTable questions={pacing.slowCorrectQuestions} />
+        </section>
+      )}
 
       <Tabs defaultValue="practice">
         <TabsList>
@@ -97,8 +128,8 @@ export function StatsClient({ bundle, insights }: { bundle: StatsBundle; insight
                 b={{ label: "Fill-in response", rate: p.byQuestionType[1].rate, graded: p.byQuestionType[1].graded }}
               />
               <StatTilePair
-                a={{ label: "Not marked for review", rate: p.markForReview[0].rate, graded: p.markForReview[0].graded }}
-                b={{ label: "Marked for review", rate: p.markForReview[1].rate, graded: p.markForReview[1].graded }}
+                a={{ label: "Not marked for review (sets only)", rate: p.markForReview[0].rate, graded: p.markForReview[0].graded }}
+                b={{ label: "Marked for review (sets only)", rate: p.markForReview[1].rate, graded: p.markForReview[1].graded }}
               />
               <RateBarChart
                 title="Accuracy by hint usage"

@@ -15,6 +15,7 @@
     "convert:math": "tsx scripts/convert-math.ts",
     "load": "tsx scripts/load.ts",
     "load:upsert": "tsx scripts/load.ts --mode=upsert",
+    "embed": "tsx scripts/embed-questions.ts",
     "db:verify": "tsx scripts/verify.ts",
     "db:reset-users": "tsx scripts/reset-user-data.ts",
     "design:exam": "tsx scripts/design-exam.ts"

@@ -29,6 +29,7 @@ import {
   ExamIcon,
   GraduationCapIcon,
   LightbulbIcon,
+  MagnifyingGlassIcon,
   StackIcon,
 } from "@phosphor-icons/react/dist/ssr";
 
@@ -259,6 +260,10 @@ export default async function HomePage() {
                 <Button variant="ghost" size="sm" render={<Link href="/new" />} nativeButton={false}>
                   <PlusIcon data-icon="inline-start" />
                   New set
+                </Button>
+                <Button variant="ghost" size="sm" render={<Link href="/problems" />} nativeButton={false}>
+                  <MagnifyingGlassIcon data-icon="inline-start" />
+                  Question bank
                 </Button>
                 <Button variant="ghost" size="sm" render={<Link href="/sets" />} nativeButton={false}>
                   <BooksIcon data-icon="inline-start" />

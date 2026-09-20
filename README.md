@@ -54,6 +54,17 @@ misunderstanding that keeps recurring — to the AI for a short written
 analysis and 1-3 recommended practice sets, each one clickable straight into
 a real, ready-to-answer set targeting exactly the skills it flagged.
 
+A third way to reach a question, alongside random-sampled sets and premade
+tests: `/problems` is a Bluebook-style browser over the entire question
+bank — filter and sort by test, section, domain, skill, and difficulty,
+expand any row to read the full question, and reveal the answer and
+rationale on demand. A sticky bar lets you hand-pick questions into a set as
+you browse, then run it through the normal practice runner. Optionally, once
+you've run the one-time `pnpm embed` step, every row also gets a "View
+similar problems" link that re-ranks the same browser by content similarity
+to that question — reachable from `/problems` itself, from the post-answer
+feedback in the practice runner, and from a set's results page.
+
 ## From-scratch setup
 
 Everything below assumes a fresh machine — nothing installed, no database,
@@ -136,6 +147,17 @@ re-fetching from the start. `db:verify` should finish with
 `All hard invariants passed.`; if it doesn't, don't proceed to step 5 — fix
 the pipeline first (see `scripts/README.md`).
 
+Optionally, a fifth step enables "View similar problems" on `/problems` and
+in the practice runner — requires `OPENROUTER_API_KEY` (see
+[Optional API keys](#optional-api-keys) below) and costs about $0.15–0.20:
+
+```bash
+pnpm embed           # Postgres -> per-question embeddings, for "View similar problems" (needs OPENROUTER_API_KEY)
+```
+
+Skip it and the feature just doesn't appear in the UI — see
+[scripts/README.md](./scripts/README.md#stage-5-embeddings-for-view-similar-problems-pnpm-embed).
+
 ### 5. Run it
 
 ```bash
@@ -151,7 +173,9 @@ Both are optional — each feature degrades gracefully (disabled button with an
 explanation) if its key is unset:
 
 - `OPENROUTER_API_KEY` — Strobi's hints, reaction takeaways, and post-answer
-  chat, plus the Stats page's "Analyze my performance" feature, via
+  chat, the Stats page's "Analyze my performance" feature, and (via a
+  one-time `pnpm embed` run — see step 4 above) "View similar problems" on
+  `/problems` and in the practice runner, via
   [OpenRouter](https://openrouter.ai/keys).
 - `NEXT_PUBLIC_DESMOS_API_KEY` — the runner's calculator, via a free key from
   [desmos.com/api](https://www.desmos.com/api).
@@ -171,6 +195,10 @@ pnpm prisma db update       # apply any new columns/tables to your existing DB
 Then restart `pnpm dev` if it was already running — it loads `contract.json`
 once at boot, so it won't see a schema change from `db update` until it's
 restarted.
+
+If this pull added "View similar problems" (a `question_embedding` table)
+and you have `OPENROUTER_API_KEY` set, run `pnpm embed` once to populate it
+— see [scripts/README.md](./scripts/README.md#stage-5-embeddings-for-view-similar-problems-pnpm-embed).
 
 ## Stack
 

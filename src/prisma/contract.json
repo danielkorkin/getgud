@@ -44,6 +44,10 @@
       "model": "QuestionAssessment",
       "namespace": "public"
     },
+    "question_embedding": {
+      "model": "QuestionEmbedding",
+      "namespace": "public"
+    },
     "question_hint": {
       "model": "QuestionHint",
       "namespace": "public"
@@ -1950,6 +1954,21 @@
                   "namespace": "public"
                 }
               },
+              "embeddings": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "questionId"
+                  ]
+                },
+                "to": {
+                  "model": "QuestionEmbedding",
+                  "namespace": "public"
+                }
+              },
               "hints": {
                 "cardinality": "1:N",
                 "on": {
@@ -2275,6 +2294,104 @@
               },
               "namespaceId": "public",
               "table": "question_assessment"
+            }
+          },
+          "QuestionEmbedding": {
+            "fields": {
+              "contentHash": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              },
+              "dim": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "model": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "questionId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "textVariant": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "vector": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bytea@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "question": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "questionId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Question",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "contentHash": {
+                  "column": "contentHash"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "dim": {
+                  "column": "dim"
+                },
+                "model": {
+                  "column": "model"
+                },
+                "questionId": {
+                  "column": "questionId"
+                },
+                "textVariant": {
+                  "column": "textVariant"
+                },
+                "vector": {
+                  "column": "vector"
+                }
+              },
+              "namespaceId": "public",
+              "table": "question_embedding"
             }
           },
           "QuestionHint": {
@@ -4003,6 +4120,95 @@
               },
               "uniques": []
             },
+            "question_embedding": {
+              "columns": {
+                "contentHash": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "createdAt": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "dim": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "model": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "questionId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "textVariant": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "vector": {
+                  "codecId": "pg/bytea@1",
+                  "nativeType": "bytea",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "questionId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "question_embedding"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "question"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "model",
+                    "textVariant"
+                  ],
+                  "name": "question_embedding_model_textVariant_idx_e3174edd",
+                  "prefix": "question_embedding_model_textVariant_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "questionId"
+                  ],
+                  "name": "question_embedding_questionId_idx_fdb42076",
+                  "prefix": "question_embedding_questionId_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "questionId",
+                  "model",
+                  "textVariant"
+                ]
+              },
+              "uniques": []
+            },
             "question_hint": {
               "columns": {
                 "content": {
@@ -4078,7 +4284,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "ed5bffaac3428ea9c29c4f9323d47c367b4a80a8973a3ebc165fc78ddf8c9d0f"
+    "storageHash": "5a50ae8f065d104a744775e96d05df6b179d5e742682a42a074aa6cfaf3ce733"
   },
   "capabilities": {
     "postgres": {

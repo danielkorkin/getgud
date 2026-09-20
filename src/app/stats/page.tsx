@@ -10,7 +10,7 @@ export default async function StatsPage() {
   if (!profile) redirect("/");
 
   const bundle = await loadStatsBundle(profile.id);
-  const insights = computeInsights(bundle.practice, bundle.exam);
+  const insights = computeInsights(bundle.practice, bundle.exam, bundle.pacing);
 
   return (
     <>

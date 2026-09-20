@@ -72,6 +72,7 @@ model Question {
   setItems   PracticeSetItem[]
   attempts   Attempt[]
   hints      QuestionHint[]
+  embeddings QuestionEmbedding[]
 
   @@map("question")
   @@index([type])
@@ -111,6 +112,30 @@ model QuestionAssessment {
   @@index([assessment, section, domainCode, skillCode], name: "qa_asmt_section_domain_skill")
   @@index([assessment, difficulty])
   @@index([bankQuestionId])
+}
+
+// Vector representation of a question's content, for "View similar problems"
+// (src/lib/query/similar-questions.ts). Shared across profiles like
+// QuestionHint — it's derived from Question content, not user history, so
+// `pnpm db:reset-users` never touches it. Keyed by (questionId, model,
+// textVariant) rather than questionId alone so a future model change is
+// additive (old + new vectors coexist for comparison) instead of a wipe.
+model QuestionEmbedding {
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  model       String // OpenRouter model id, e.g. 'google/gemini-embedding-2'
+  textVariant String // 'full' — stimulus + stem + answer-option text concatenated
+
+  dim         Int
+  contentHash String // Question.contentHash at embed time — drives re-embedding on drift
+  vector      Bytes  // dim x float32, little-endian, L2-NORMALIZED on write (see embed-questions.ts)
+
+  createdAt TimestamptzString @default(now())
+
+  @@id([questionId, model, textVariant])
+  @@map("question_embedding")
+  @@index([model, textVariant])
 }
 
 // ─── Practice tool ──────────────────────────────────────────────────────────

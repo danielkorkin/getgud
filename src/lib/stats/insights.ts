@@ -5,14 +5,66 @@
 // not arbitrary).
 
 import { formatDuration } from "@/lib/stats/format";
-import { median, type ExamStats, type Insight, type PracticeStats } from "@/lib/stats/aggregate";
+import { median, type ExamStats, type Insight, type PacingSkillRow, type PacingStats, type PracticeStats } from "@/lib/stats/aggregate";
 
 function pctLabel(rate: number): string {
   return `${Math.round(rate * 100)}%`;
 }
 
-export function computeInsights(practice: PracticeStats | null, exam: ExamStats | null): Insight[] {
+export function computeInsights(practice: PracticeStats | null, exam: ExamStats | null, pacing: PacingStats | null): Insight[] {
   const insights: Insight[] = [];
+
+  // Pacing insights run first — combined across practice sets and practice
+  // tests (see `PacingStats`'s comment) — so `pacingConcern` is available
+  // below to keep the practice-only "slow-skill" rule from repeating it.
+  let pacingConcern: PacingSkillRow | null = null;
+  if (pacing) {
+    // Slow-but-correct: a skill where a big share of *correct* answers still
+    // ran well over this student's normal pace for that section+difficulty.
+    // Only fires on answers that were actually right, which is exactly the
+    // "should've been marked for review even though it was correct" case a
+    // plain accuracy/time view misses.
+    const pacingCandidates = pacing.bySkill.filter((s) => s.correctGraded >= 5 && s.slowCorrectRate >= 0.4);
+    pacingConcern = pacingCandidates.length > 0 ? pacingCandidates.reduce((a, b) => (b.slowCorrectRate > a.slowCorrectRate ? b : a)) : null;
+    if (pacingConcern) {
+      insights.push({
+        id: `pacing-risk:${pacingConcern.skillCode}`,
+        severity: "opportunity",
+        text: `${pacingConcern.skillLabel}: ${pacingConcern.slowCorrectCount} of your ${pacingConcern.correctGraded} correct answers took well over your normal pace — you know the material, but it's costing you time you won't have on test day.`,
+        targetSkillCode: pacingConcern.skillCode,
+      });
+    }
+
+    // Rushed mistakes — the mirror image: wrong answers that came in well
+    // *under* pace (excludes gave-up reveals and hinted answers), a
+    // carelessness signal rather than a knowledge gap.
+    const rushedCandidates = pacing.bySkill.filter((s) => s.triedWrong >= 5 && s.rushedWrongRate >= 0.35);
+    if (rushedCandidates.length > 0) {
+      const worst = rushedCandidates.reduce((a, b) => (b.rushedWrongRate > a.rushedWrongRate ? b : a));
+      insights.push({
+        id: `rushed-mistakes:${worst.skillCode}`,
+        severity: "notice",
+        text: `${worst.skillLabel}: ${worst.rushedWrongCount} of your ${worst.triedWrong} wrong answers came unusually fast — slow down and double-check before submitting instead of rushing past it.`,
+        targetSkillCode: worst.skillCode,
+      });
+    }
+
+    // Marked-for-review accuracy — is the instinct to flag a question
+    // actually tracking with getting it wrong? Combined across both modes
+    // (a student can mark a question for review in an exam module too).
+    const notMarked = pacing.markForReview.find((b) => !b.marked);
+    const marked = pacing.markForReview.find((b) => b.marked);
+    if (notMarked && marked && notMarked.graded >= 5 && marked.graded >= 5) {
+      const gap = notMarked.rate - marked.rate;
+      if (gap >= 0.15) {
+        insights.push({
+          id: "mark-for-review",
+          severity: "opportunity",
+          text: `Questions you marked for review were right only ${pctLabel(marked.rate)} of the time, vs ${pctLabel(notMarked.rate)} for the rest — that instinct is worth trusting; double-check flagged questions before submitting.`,
+        });
+      }
+    }
+  }
 
   if (practice) {
     // Weakest skill, at least 8 graded questions, at least 15pts below overall.
@@ -126,10 +178,16 @@ export function computeInsights(practice: PracticeStats | null, exam: ExamStats 
       }
     }
 
-    // Domain slower-than-average.
+    // Domain slower-than-average — skips whatever skill pacing-risk above
+    // already flagged, since both would otherwise describe the same "you're
+    // slow here" fact about the same skill.
     const overallMedianActive = median(practice.bySkill.flatMap((s) => Array(s.graded).fill(s.avgActiveMs)));
     const slowDomain = practice.bySkill.find(
-      (s) => s.graded >= 8 && overallMedianActive > 0 && s.avgActiveMs >= overallMedianActive * 1.4,
+      (s) =>
+        s.graded >= 8 &&
+        overallMedianActive > 0 &&
+        s.avgActiveMs >= overallMedianActive * 1.4 &&
+        s.skillCode !== pacingConcern?.skillCode,
     );
     if (slowDomain) {
       const pctSlower = Math.round((slowDomain.avgActiveMs / overallMedianActive - 1) * 100);
@@ -152,21 +210,6 @@ export function computeInsights(practice: PracticeStats | null, exam: ExamStats 
             gap > 0
               ? `Your accuracy is trending up: ${pctLabel(practice.trend.firstRate)} early on vs ${pctLabel(practice.trend.lastRate)} recently.`
               : `Your accuracy has slipped recently: ${pctLabel(practice.trend.firstRate)} early on vs ${pctLabel(practice.trend.lastRate)} now.`,
-        });
-      }
-    }
-
-    // Marked-for-review accuracy — is the instinct to flag a question
-    // actually tracking with getting it wrong?
-    const notMarked = practice.markForReview.find((b) => !b.marked);
-    const marked = practice.markForReview.find((b) => b.marked);
-    if (notMarked && marked && notMarked.graded >= 5 && marked.graded >= 5) {
-      const gap = notMarked.rate - marked.rate;
-      if (gap >= 0.15) {
-        insights.push({
-          id: "mark-for-review",
-          severity: "opportunity",
-          text: `Questions you marked for review were right only ${pctLabel(marked.rate)} of the time, vs ${pctLabel(notMarked.rate)} for the rest — that instinct is worth trusting; double-check flagged questions before submitting.`,
         });
       }
     }

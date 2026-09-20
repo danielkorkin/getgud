@@ -32,7 +32,8 @@ import { DesmosCalculator } from "@/components/practice/desmos-calculator";
 import { ReferenceSheet } from "@/components/practice/reference-sheet";
 import { Coach } from "@/components/practice/coach/coach";
 import { NotesPanel } from "@/components/practice/notes-panel";
-import { ArrowLeftIcon, ArrowRightIcon, CheckCircleIcon, XCircleIcon } from "@phosphor-icons/react";
+import Link from "next/link";
+import { ArrowLeftIcon, ArrowRightIcon, CheckCircleIcon, XCircleIcon, SparkleIcon } from "@phosphor-icons/react";
 
 const DIFFICULTY_VARIANT = { E: "tag-green", M: "tag-yellow", H: "tag-red" } as const;
 
@@ -45,6 +46,7 @@ export function PracticeRunner({
   startPosition,
   initialItems,
   hintsEnabled,
+  similarSearchEnabled,
 }: {
   setId: string;
   setName: string;
@@ -52,6 +54,8 @@ export function PracticeRunner({
   startPosition: number;
   initialItems: NavItemState[];
   hintsEnabled: boolean;
+  /** Whether `pnpm embed` has populated the similarity index — hides "View similar" entirely when it hasn't. */
+  similarSearchEnabled: boolean;
 }) {
   const [position, setPosition] = useState(startPosition);
   const [items, setItems] = useState(initialItems);
@@ -427,6 +431,24 @@ export function PracticeRunner({
             className="text-sm leading-relaxed text-muted-foreground [&_.katex]:text-foreground"
             dangerouslySetInnerHTML={{ __html: feedback.rationaleHtml }}
           />
+          {similarSearchEnabled && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="self-start"
+              render={
+                <Link
+                  href={`/problems?similar=${current.item.questionId}&assessment=${encodeURIComponent(current.item.assessment)}&sections=${current.item.sectionCode}`}
+                  target="_blank"
+                />
+              }
+              nativeButton={false}
+            >
+              <SparkleIcon data-icon="inline-start" />
+              View similar problems
+            </Button>
+          )}
         </div>
       )}
     </div>

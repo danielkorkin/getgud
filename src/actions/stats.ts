@@ -11,7 +11,7 @@ import { loadChatExcerpts, type ChatExcerpt } from "@/lib/stats/chat-history";
 import type { StatsBundle } from "@/lib/stats/aggregate";
 
 function toStatsSummaryInput(bundle: StatsBundle, chatExcerpts: ChatExcerpt[]): StatsSummaryInput {
-  const insights = computeInsights(bundle.practice, bundle.exam);
+  const insights = computeInsights(bundle.practice, bundle.exam, bundle.pacing);
   return {
     overallAccuracy: bundle.practice?.overallAccuracy ?? 0,
     totalGraded: bundle.practice?.totalGraded ?? 0,
@@ -30,11 +30,28 @@ function toStatsSummaryInput(bundle: StatsBundle, chatExcerpts: ChatExcerpt[]): 
       })),
     byDifficulty: bundle.practice?.byDifficulty ?? [],
     hintImpact: bundle.practice?.hintImpact ?? [],
-    markForReview: bundle.practice?.markForReview ?? [],
+    // Combined across practice sets and practice tests (see `PacingStats`'s
+    // comment in aggregate.ts) — unlike the fields above, which stay
+    // practice-only.
+    markForReview: bundle.pacing?.markForReview ?? [],
     calculatorUsage: bundle.practice?.calculatorUsage ?? [],
     referenceSheetUsage: bundle.practice?.referenceSheetUsage ?? [],
     byTimeOfDay: bundle.practice?.byTimeOfDay ?? [],
     trend: bundle.practice?.trend ?? null,
+    // Same low-n guard as bySkill above, plus only send skills that actually
+    // show the pattern — no point spending prompt space on a skill with
+    // zero slow-correct or rushed-wrong answers. Also combined across both
+    // modes.
+    pacingConcerns: (bundle.pacing?.bySkill ?? [])
+      .filter((s) => s.correctGraded >= 3 && s.slowCorrectCount > 0)
+      .sort((a, b) => b.slowCorrectRate - a.slowCorrectRate)
+      .slice(0, 5)
+      .map((s) => ({ skillCode: s.skillCode, skillLabel: s.skillLabel, correctGraded: s.correctGraded, slowCorrectCount: s.slowCorrectCount })),
+    rushedMistakes: (bundle.pacing?.bySkill ?? [])
+      .filter((s) => s.triedWrong >= 3 && s.rushedWrongCount > 0)
+      .sort((a, b) => b.rushedWrongRate - a.rushedWrongRate)
+      .slice(0, 5)
+      .map((s) => ({ skillCode: s.skillCode, skillLabel: s.skillLabel, triedWrong: s.triedWrong, rushedWrongCount: s.rushedWrongCount })),
     avgActiveMsOverall: bundle.headline.avgActiveMs,
     examScoreTrend: (bundle.exam?.scoreTrend ?? []).map((e) => ({ totalScaled: e.totalScaled, completedAt: e.completedAt })),
     recentInsights: insights.map((i) => i.text),
@@ -49,7 +66,7 @@ export async function analyzeStats(): Promise<{ analysis: Analysis } | { error: 
   }
 
   const [bundle, chatExcerpts] = await Promise.all([loadStatsBundle(profileId), loadChatExcerpts(profileId)]);
-  if (bundle.practice === null && bundle.exam === null) {
+  if (bundle.practice === null && bundle.exam === null && bundle.pacing === null) {
     return { error: "Complete a few practice questions first — there's nothing to analyze yet." };
   }
 

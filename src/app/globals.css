@@ -265,3 +265,55 @@
    recognize ::highlight() and fails the production build on it, even
    though every ::highlight()-supporting browser parses it fine at
    runtime. */
+
+/* Data tables inside question content (stem/stimulus/rationale/answer
+   choices). This markup comes from College Board's own HTML via
+   src/lib/content/render.ts's `wrapTables` — DOMPurify already lets
+   <table>/<tr>/<td> etc. through, but nothing styled them, so they used to
+   render with bare, unbordered user-agent defaults. `.qbank-table-wrap`
+   is the scroll container `wrapTables` adds around every <table>, needed
+   because a wide table (a 5+ column data set) would otherwise overflow a
+   narrow runner pane or a phone-width viewport with no way to reach the
+   remaining columns. */
+.qbank-table-wrap {
+  overflow-x: auto;
+  margin-block: 0.75rem;
+}
+
+.qbank-table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+
+.qbank-table-wrap caption {
+  caption-side: top;
+  padding-block-end: 0.4rem;
+  font-weight: 600;
+}
+
+.qbank-table-wrap th,
+.qbank-table-wrap td {
+  border: 1px solid var(--border);
+  padding: 0.4rem 0.65rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+/* College Board marks row headers as <th scope="row"> inside <tbody>, not
+   just column headers inside <thead> — bold both, but only shade the
+   column-header row so a row-header column doesn't read as a second
+   header band. Cells that carry their own `style="text-align: …"` (most
+   numeric columns do) override this via normal inline-style precedence. */
+.qbank-table-wrap th {
+  font-weight: 600;
+}
+
+.qbank-table-wrap thead th {
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+
+.qbank-table-wrap tbody tr:nth-child(even) {
+  background: color-mix(in oklch, var(--muted) 45%, transparent);
+}

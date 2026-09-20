@@ -49,7 +49,15 @@ export default async function SetsLibraryPage() {
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {sets.map((set) => {
-            const href = set.status === "in_progress" ? `/sets/${set.id}` : `/sets/${set.id}/results`;
+            // A hand-picked draft (src/app/problems) with nothing added yet
+            // has no items — send it back to where it's built rather than
+            // into the runner, which has nothing to render for it.
+            const isEmptyDraft = set.status === "in_progress" && set.questionCount === 0;
+            const href = isEmptyDraft
+              ? `/problems?set=${set.id}`
+              : set.status === "in_progress"
+                ? `/sets/${set.id}`
+                : `/sets/${set.id}/results`;
             const pct = set.gradedCount > 0 ? Math.round((set.correctCount / set.gradedCount) * 100) : null;
             return (
               <Link key={set.id} href={href} className="block">
@@ -57,8 +65,8 @@ export default async function SetsLibraryPage() {
                   <CardHeader>
                     <div className="flex items-center justify-between gap-2">
                       <CardTitle className="text-base">{set.name}</CardTitle>
-                      <Badge variant={STATUS_VARIANT[set.status] ?? "secondary"}>
-                        {STATUS_LABEL[set.status] ?? set.status}
+                      <Badge variant={isEmptyDraft ? "secondary" : STATUS_VARIANT[set.status] ?? "secondary"}>
+                        {isEmptyDraft ? "Draft" : STATUS_LABEL[set.status] ?? set.status}
                       </Badge>
                     </div>
                     <CardDescription>
