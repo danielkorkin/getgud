@@ -7,6 +7,8 @@
 // of how much history exists.
 import "server-only";
 
+import type { QuestionDetails } from "@/lib/stats/question-details";
+
 export interface StatsSummaryInput {
   overallAccuracy: number;
   totalGraded: number;
@@ -43,6 +45,11 @@ export interface StatsSummaryInput {
    *  text, so the model (not a rule) is what can actually notice a
    *  recurring conceptual trouble spot across them. */
   chatExcerpts: { skillLabel: string; domainLabel: string; isCorrect: boolean | null; excerpt: string }[];
+  /** Actual recent questions (passage/stem/choices/answers), not just facet
+   *  codes — see question-details.ts. Lets the model spot a content-level
+   *  pattern (a recurring trap-answer type, phrasing, or question format) a
+   *  skill-code accuracy breakdown can't show on its own. */
+  questionDetails: QuestionDetails;
 }
 
 const SYSTEM_RULES = [
@@ -53,11 +60,24 @@ const SYSTEM_RULES = [
   "Each recommended set's skillCodes must come only from the skill codes listed in the data below — never invent a code.",
   "The summary isn't limited to skill accuracy — if a behavioral pattern (calculator/reference-sheet usage, marking questions for review, time of day, or a recent trend) is the most notable signal in the data, lead with that instead of a generic accuracy restatement.",
   "If past coach-chat excerpts are provided, read them for recurring conceptual trouble — the same kind of confusion or misunderstanding showing up across more than one conversation, not a one-off question. List each such pattern as a short phrase (under 15 words) naming the specific confusion, e.g. \"mixes up correlation and causation in scatterplot questions\" — not a restatement of an accuracy number. Return an empty list if the excerpts don't show a repeated pattern, or if none are provided.",
+  "Below the aggregated numbers, actual recent questions are included verbatim — passage/stem, choices, the student's own answer, and the correct answer — a batch of recent wrong answers plus a smaller batch of recent correct ones for contrast. Read these for content-level patterns a skill-code breakdown can't show: the same kind of trap answer chosen more than once, a specific phrasing or question format (e.g. dual-passage, graph-reading, a particular kind of algebraic setup) that recurs among the misses. Only report such a pattern — in the summary or as a trouble spot — if it actually recurs across more than one of the shown questions; a single missed question is never a pattern.",
   "Pacing concerns and rushed mistakes are real weaknesses even on skills with fine accuracy — a skill the student gets right but consistently too slowly is worth a timed-drilling recommendation, and a skill where wrong answers come in unusually fast is worth flagging as a carelessness pattern, not a knowledge gap.",
 ];
 
 function formatPct(correct: number, graded: number): string {
   return graded > 0 ? `${Math.round((correct / graded) * 100)}%` : "n/a";
+}
+
+function formatQuestionDetail(q: QuestionDetails["wrong"][number], index: number): string {
+  return [
+    `Question ${index + 1} — ${q.isCorrect ? "CORRECT" : "WRONG"} (${q.sectionCode}, ${q.skillLabel} / ${q.domainLabel}, difficulty ${q.difficulty}):`,
+    q.stimulus ? `Passage: ${q.stimulus}` : null,
+    `Prompt: ${q.stem}`,
+    q.options ? `Choices:\n${q.options.join("\n")}` : null,
+    `Student answered: ${q.studentAnswer}. Correct answer: ${q.correctAnswer}.`,
+  ]
+    .filter((line): line is string => line !== null)
+    .join("\n");
 }
 
 export function buildRecommendationPrompt(input: StatsSummaryInput): { system: string; prompt: string } {
@@ -126,6 +146,16 @@ export function buildRecommendationPrompt(input: StatsSummaryInput): { system: s
           .join("\n\n")
       : "(no past coach conversations)";
 
+  const wrongQuestionLines =
+    input.questionDetails.wrong.length > 0
+      ? input.questionDetails.wrong.map((q, i) => formatQuestionDetail(q, i)).join("\n\n")
+      : "(no wrong answers recorded yet)";
+
+  const correctQuestionLines =
+    input.questionDetails.correct.length > 0
+      ? input.questionDetails.correct.map((q, i) => formatQuestionDetail(q, i)).join("\n\n")
+      : "(none)";
+
   const prompt = [
     `Overall practice accuracy: ${Math.round(input.overallAccuracy * 100)}% across ${input.totalGraded} graded questions.`,
     `Average time per question: ${Math.round(input.avgActiveMsOverall / 1000)}s.`,
@@ -155,6 +185,10 @@ export function buildRecommendationPrompt(input: StatsSummaryInput): { system: s
     insightLines,
     "\nExcerpts from past post-answer coach conversations (most recent first):",
     chatLines,
+    "\nRecent questions answered WRONG, with full content (read for content-level patterns, not just the skill code):",
+    wrongQuestionLines,
+    "\nA sample of recent questions answered CORRECTLY, for contrast:",
+    correctQuestionLines,
   ].join("\n");
 
   return { system, prompt };

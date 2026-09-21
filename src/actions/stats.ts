@@ -8,9 +8,10 @@ import { AnalysisSchema, type Analysis } from "@/lib/ai/stats-schema";
 import { computeInsights } from "@/lib/stats/insights";
 import { loadStatsBundle } from "@/lib/stats/load";
 import { loadChatExcerpts, type ChatExcerpt } from "@/lib/stats/chat-history";
+import { loadQuestionDetails, type QuestionDetails } from "@/lib/stats/question-details";
 import type { StatsBundle } from "@/lib/stats/aggregate";
 
-function toStatsSummaryInput(bundle: StatsBundle, chatExcerpts: ChatExcerpt[]): StatsSummaryInput {
+function toStatsSummaryInput(bundle: StatsBundle, chatExcerpts: ChatExcerpt[], questionDetails: QuestionDetails): StatsSummaryInput {
   const insights = computeInsights(bundle.practice, bundle.exam, bundle.pacing);
   return {
     overallAccuracy: bundle.practice?.overallAccuracy ?? 0,
@@ -56,6 +57,7 @@ function toStatsSummaryInput(bundle: StatsBundle, chatExcerpts: ChatExcerpt[]): 
     examScoreTrend: (bundle.exam?.scoreTrend ?? []).map((e) => ({ totalScaled: e.totalScaled, completedAt: e.completedAt })),
     recentInsights: insights.map((i) => i.text),
     chatExcerpts,
+    questionDetails,
   };
 }
 
@@ -65,12 +67,16 @@ export async function analyzeStats(): Promise<{ analysis: Analysis } | { error: 
     return { error: "AI analysis isn't configured — set OPENROUTER_API_KEY to enable it." };
   }
 
-  const [bundle, chatExcerpts] = await Promise.all([loadStatsBundle(profileId), loadChatExcerpts(profileId)]);
+  const [bundle, chatExcerpts, questionDetails] = await Promise.all([
+    loadStatsBundle(profileId),
+    loadChatExcerpts(profileId),
+    loadQuestionDetails(profileId),
+  ]);
   if (bundle.practice === null && bundle.exam === null && bundle.pacing === null) {
     return { error: "Complete a few practice questions first — there's nothing to analyze yet." };
   }
 
-  const { system, prompt } = buildRecommendationPrompt(toStatsSummaryInput(bundle, chatExcerpts));
+  const { system, prompt } = buildRecommendationPrompt(toStatsSummaryInput(bundle, chatExcerpts, questionDetails));
 
   try {
     const { object } = await generateObject({ model: getAnalysisModel(), schema: AnalysisSchema, system, prompt });

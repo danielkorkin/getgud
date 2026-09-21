@@ -784,13 +784,25 @@ computation and I/O:**
   the handful of plain-English sentences shown as `Alert`s. Every rule has an
   explicit minimum-sample-size guard (see the numbers inline) so a skill with
   one graded question never drives a claim.
-- `src/lib/stats/load.ts` / `chat-history.ts` — the I/O half: `loadStatsBundle(profileId)`
-  runs the three `Attempt`/`PracticeSet`/`ExamSession` queries and calls
-  `buildStatsBundle`; `loadChatExcerpts(profileId)` separately pulls the 8
-  most recent non-empty `Attempt.chatMessages` conversations (truncated
-  per-conversation) for the AI to read. Both `src/app/stats/page.tsx` and
-  `src/actions/stats.ts` call these rather than querying directly, so the
-  page and the AI prompt never drift out of sync on what "the stats" are.
+- `src/lib/stats/load.ts` / `chat-history.ts` / `question-details.ts` — the
+  I/O half: `loadStatsBundle(profileId)` runs the three
+  `Attempt`/`PracticeSet`/`ExamSession` queries and calls `buildStatsBundle`;
+  `loadChatExcerpts(profileId)` separately pulls the 8 most recent non-empty
+  `Attempt.chatMessages` conversations (truncated per-conversation);
+  `loadQuestionDetails(profileId)` separately pulls the 15 most recent wrong
+  attempts plus 8 most recent correct ones, joined by hand to their
+  `Question` row (this ORM has no relation `.include()` used anywhere else
+  in the app, so this follows the existing two-query-and-join-in-JS pattern
+  from `access.ts`/`attempts.ts` rather than introducing a new one) and
+  truncated per-field (stimulus/stem to 280 chars, each choice to 120) —
+  real question content for the AI to read directly, not just facet codes,
+  so it can notice a content-level pattern (a recurring trap answer, a
+  phrasing, a question format) that an accuracy-by-skill-code breakdown
+  can't show. Only `analyzeStats()` reads this one (unlike the other two,
+  `/stats`'s own page never needs raw question text). All three are called
+  by `src/app/stats/page.tsx` and/or `src/actions/stats.ts` rather than
+  querying directly, so the page and the AI prompt never drift out of sync
+  on what "the stats" are.
 - `src/lib/ai/stats-prompt.ts` / `stats-schema.ts` / `src/actions/stats.ts` —
   the AI half, mirroring `coach-prompt.ts`'s shape (pure prompt builder in,
   `generateObject` call in the action). `analyzeStats()` is a Server Action,
