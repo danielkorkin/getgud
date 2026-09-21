@@ -22,11 +22,16 @@ export function ProblemsBrowser({
   activeSet,
   draftSets,
   filtersQuery,
+  defaultOpenId = null,
 }: {
   rows: ProblemRowData[];
   activeSet: ActiveSet | null;
   draftSets: DraftSetOption[];
   filtersQuery: string;
+  /** A row to auto-expand on load — e.g. a "?question=<id>" deep link from
+   *  Smart select (src/app/problems/page.tsx's `focusId`). Uncontrolled: the
+   *  visitor can still collapse it or open others afterward. */
+  defaultOpenId?: string | null;
 }) {
   const router = useRouter();
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
@@ -114,7 +119,7 @@ export function ProblemsBrowser({
       {rows.length === 0 ? (
         <p className="py-12 text-center text-sm text-muted-foreground">No questions match these filters.</p>
       ) : (
-        <Accordion multiple>
+        <Accordion multiple defaultValue={defaultOpenId ? [defaultOpenId] : undefined}>
           {rows.map((row) => (
             <ProblemRow
               key={row.questionId}

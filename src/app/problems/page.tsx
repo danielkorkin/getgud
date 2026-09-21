@@ -233,7 +233,10 @@ export default async function ProblemsPage({ searchParams }: PageProps<"/problem
   );
   const totalPages = Math.max(1, Math.ceil(total / BROWSE_PAGE_SIZE));
   const filtersQuery = browseParamsToQuery(filters);
-  const clearSimilarHref = activeSet ? `/problems?set=${encodeURIComponent(activeSet.id)}` : "/problems";
+  // Shared by both the "Similar to" and "Opened question" banners' Clear
+  // buttons — neither carries any other filter state worth preserving, so
+  // both just drop back to a plain (or active-set-scoped) browse view.
+  const clearContextHref = activeSet ? `/problems?set=${encodeURIComponent(activeSet.id)}` : "/problems";
 
   return (
     <>
@@ -244,11 +247,23 @@ export default async function ProblemsPage({ searchParams }: PageProps<"/problem
           <h1 className="text-4xl font-medium tracking-tight">Browse every problem</h1>
         </header>
 
+        {filters.focusId && (
+          <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 p-4">
+            <p className="text-sm text-muted-foreground">
+              {rows.length > 0 ? "Showing the one question you opened." : "That question could not be found."}
+            </p>
+            <Button variant="ghost" size="sm" render={<Link href={clearContextHref} />} nativeButton={false}>
+              <XIcon data-icon="inline-start" />
+              Show all questions
+            </Button>
+          </div>
+        )}
+
         {filters.similarTo && (
           <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-4">
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs tracking-[0.05em] text-muted-foreground uppercase">Similar to</span>
-              <Button variant="ghost" size="sm" render={<Link href={clearSimilarHref} />} nativeButton={false}>
+              <Button variant="ghost" size="sm" render={<Link href={clearContextHref} />} nativeButton={false}>
                 <XIcon data-icon="inline-start" />
                 Clear
               </Button>
@@ -288,7 +303,13 @@ export default async function ProblemsPage({ searchParams }: PageProps<"/problem
 
           <div className="flex flex-col gap-4">
             <ResultsToolbar filters={filters} resultCount={total} />
-            <ProblemsBrowser rows={renderedRows} activeSet={activeSet} draftSets={draftSets} filtersQuery={filtersQuery} />
+            <ProblemsBrowser
+              rows={renderedRows}
+              activeSet={activeSet}
+              draftSets={draftSets}
+              filtersQuery={filtersQuery}
+              defaultOpenId={filters.focusId || null}
+            />
             <PaginationBar filters={filters} totalPages={totalPages} activeSetId={activeSet?.id ?? null} />
           </div>
         </div>

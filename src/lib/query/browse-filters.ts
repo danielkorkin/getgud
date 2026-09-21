@@ -59,6 +59,17 @@ export interface BrowseFilters {
   page: number;
   /** "View similar problems" source question id. "" = off (plain browse). */
   similarTo: string;
+  /**
+   * "Open this one question" deep link — e.g. a Smart select card
+   * (src/components/set-builder/smart-select-panel.tsx) linking straight
+   * into the library. "" = off (plain browse). Unlike `similarTo`, this
+   * restricts results to exactly that one id (see buildBrowseWhereFragment
+   * in browse-questions.ts) rather than ranking a pool — the point is to
+   * always land on page 1 with the target question visible and expanded,
+   * regardless of how many other rows the current facet filters would
+   * otherwise match.
+   */
+  focusId: string;
 }
 
 export const BROWSE_PAGE_SIZE = 20;
@@ -121,6 +132,7 @@ export function parseBrowseParams(sp: BrowseSearchParams): BrowseFilters {
     : "any";
 
   const similarTo = first(sp.similar);
+  const focusId = first(sp.question);
 
   let sortRaw = first(sp.sort);
   // Default to similarity ranking when landing in similar-mode with no
@@ -147,6 +159,7 @@ export function parseBrowseParams(sp: BrowseSearchParams): BrowseFilters {
     sort,
     page,
     similarTo,
+    focusId,
   };
 }
 
@@ -175,5 +188,6 @@ export function browseParamsToQuery(f: BrowseFilters, overrides?: Partial<Browse
   if (merged.sort !== defaultSort) sp.set("sort", merged.sort);
   if (merged.page > 1) sp.set("page", String(merged.page));
   if (merged.similarTo) sp.set("similar", merged.similarTo);
+  if (merged.focusId) sp.set("question", merged.focusId);
   return sp.toString();
 }

@@ -760,6 +760,20 @@ picks are shown to the student *before* they practice the set, so leaking an
 answer here would spoil the question the same way it would in `/api/coach`
 before an attempt is answered.
 
+**Every card's title also links straight to that question in `/problems`**,
+opening in a new tab (`/new` carries too much in-progress state — filters,
+prompt, other picks — to navigate away from it). This reuses
+`browse-filters.ts`'s `focusId` (`?question=<id>`, alongside the assessment/
+section pinning `similarHref` already does), a sibling of `similarTo` added
+for exactly this: unlike `similarTo`, which narrows a ranked pool *within*
+whatever facets are active, `focusId` **bypasses every other facet filter**
+in `browse-questions.ts` (only `assessment` still applies) and restricts the
+result to that one row — the point of a direct link is that it always shows,
+regardless of whatever domain/difficulty/search/attempted state happens to
+be active on `/problems` already. `ProblemsBrowser` takes a `defaultOpenId`
+prop (`Accordion`'s uncontrolled `defaultValue`) so that one row starts
+expanded rather than requiring an extra click.
+
 **`createSmartSet` re-derives the pool server-side and intersects it with
 the client's id list rather than trusting the ids directly** — same
 "no-password profiles are still not no authorization" reasoning as

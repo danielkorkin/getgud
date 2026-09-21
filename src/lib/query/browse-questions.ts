@@ -77,6 +77,15 @@ function buildBrowseWhereFragment(filters: BrowseFilters, profileId: string, sim
     profileId,
     similarOn: filters.similarTo !== "",
     similarIds: param(similar?.ids ?? [], { codecId: "pg/text@1" }),
+    // "Open this one question" (focusId) deliberately BYPASSES every facet
+    // filter below rather than combining with them (unlike similarOn, which
+    // narrows within the current facets) — the point of following a direct
+    // link to one specific question is that it always shows, regardless of
+    // whatever domain/difficulty/type/search/attempted state happens to be
+    // active. `assessment` still applies (the same question can carry
+    // different facets per assessment) but nothing else does.
+    focusOn: filters.focusId !== "",
+    focusId: filters.focusId,
   };
 }
 
@@ -100,20 +109,25 @@ export async function countBrowseQuestions(
     FROM question q
     JOIN question_assessment qa ON qa."questionId" = q.id
     WHERE qa.assessment = ${w.assessment}::text
-      AND qa."sectionCode" = ANY(${w.sections})
-      AND qa.difficulty = ANY(${w.difficulties})
-      AND qa."domainCode" = ANY(${w.domains})
-      AND qa."skillCode" = ANY(${w.skills})
-      AND (qa."scoreBand" IS NULL OR qa."scoreBand" = ANY(${w.scoreBands}))
-      AND q.type = ANY(${w.types})
-      AND (${w.search}::text = '' OR q.stem ILIKE ${w.pattern}::text OR q.stimulus ILIKE ${w.pattern}::text)
       AND (
-        ${w.attempted}::text = 'any'
-        OR (${w.attempted}::text = 'unattempted' AND NOT EXISTS (SELECT 1 FROM attempt a WHERE a."profileId" = ${w.profileId}::text AND a."questionId" = q.id AND a.status = 'answered'))
-        OR (${w.attempted}::text = 'attempted' AND EXISTS (SELECT 1 FROM attempt a WHERE a."profileId" = ${w.profileId}::text AND a."questionId" = q.id AND a.status = 'answered'))
-        OR (${w.attempted}::text = 'incorrect' AND EXISTS (SELECT 1 FROM attempt a WHERE a."profileId" = ${w.profileId}::text AND a."questionId" = q.id AND a."isCorrect" = false))
+        (NOT ${w.focusOn} AND
+          qa."sectionCode" = ANY(${w.sections})
+          AND qa.difficulty = ANY(${w.difficulties})
+          AND qa."domainCode" = ANY(${w.domains})
+          AND qa."skillCode" = ANY(${w.skills})
+          AND (qa."scoreBand" IS NULL OR qa."scoreBand" = ANY(${w.scoreBands}))
+          AND q.type = ANY(${w.types})
+          AND (${w.search}::text = '' OR q.stem ILIKE ${w.pattern}::text OR q.stimulus ILIKE ${w.pattern}::text)
+          AND (
+            ${w.attempted}::text = 'any'
+            OR (${w.attempted}::text = 'unattempted' AND NOT EXISTS (SELECT 1 FROM attempt a WHERE a."profileId" = ${w.profileId}::text AND a."questionId" = q.id AND a.status = 'answered'))
+            OR (${w.attempted}::text = 'attempted' AND EXISTS (SELECT 1 FROM attempt a WHERE a."profileId" = ${w.profileId}::text AND a."questionId" = q.id AND a.status = 'answered'))
+            OR (${w.attempted}::text = 'incorrect' AND EXISTS (SELECT 1 FROM attempt a WHERE a."profileId" = ${w.profileId}::text AND a."questionId" = q.id AND a."isCorrect" = false))
+          )
+          AND (NOT ${w.similarOn} OR q.id = ANY(${w.similarIds}))
+        )
+        OR (${w.focusOn} AND q.id = ${w.focusId}::text)
       )
-      AND (NOT ${w.similarOn} OR q.id = ANY(${w.similarIds}))
   `
     .returnsRow({ n: "pg/int4@1" })
     .build();
@@ -181,20 +195,25 @@ async function fetchBrowseFacetRows(
     FROM question q
     JOIN question_assessment qa ON qa."questionId" = q.id
     WHERE qa.assessment = ${w.assessment}::text
-      AND qa."sectionCode" = ANY(${w.sections})
-      AND qa.difficulty = ANY(${w.difficulties})
-      AND qa."domainCode" = ANY(${w.domains})
-      AND qa."skillCode" = ANY(${w.skills})
-      AND (qa."scoreBand" IS NULL OR qa."scoreBand" = ANY(${w.scoreBands}))
-      AND q.type = ANY(${w.types})
-      AND (${w.search}::text = '' OR q.stem ILIKE ${w.pattern}::text OR q.stimulus ILIKE ${w.pattern}::text)
       AND (
-        ${w.attempted}::text = 'any'
-        OR (${w.attempted}::text = 'unattempted' AND NOT EXISTS (SELECT 1 FROM attempt a WHERE a."profileId" = ${w.profileId}::text AND a."questionId" = q.id AND a.status = 'answered'))
-        OR (${w.attempted}::text = 'attempted' AND EXISTS (SELECT 1 FROM attempt a WHERE a."profileId" = ${w.profileId}::text AND a."questionId" = q.id AND a.status = 'answered'))
-        OR (${w.attempted}::text = 'incorrect' AND EXISTS (SELECT 1 FROM attempt a WHERE a."profileId" = ${w.profileId}::text AND a."questionId" = q.id AND a."isCorrect" = false))
+        (NOT ${w.focusOn} AND
+          qa."sectionCode" = ANY(${w.sections})
+          AND qa.difficulty = ANY(${w.difficulties})
+          AND qa."domainCode" = ANY(${w.domains})
+          AND qa."skillCode" = ANY(${w.skills})
+          AND (qa."scoreBand" IS NULL OR qa."scoreBand" = ANY(${w.scoreBands}))
+          AND q.type = ANY(${w.types})
+          AND (${w.search}::text = '' OR q.stem ILIKE ${w.pattern}::text OR q.stimulus ILIKE ${w.pattern}::text)
+          AND (
+            ${w.attempted}::text = 'any'
+            OR (${w.attempted}::text = 'unattempted' AND NOT EXISTS (SELECT 1 FROM attempt a WHERE a."profileId" = ${w.profileId}::text AND a."questionId" = q.id AND a.status = 'answered'))
+            OR (${w.attempted}::text = 'attempted' AND EXISTS (SELECT 1 FROM attempt a WHERE a."profileId" = ${w.profileId}::text AND a."questionId" = q.id AND a.status = 'answered'))
+            OR (${w.attempted}::text = 'incorrect' AND EXISTS (SELECT 1 FROM attempt a WHERE a."profileId" = ${w.profileId}::text AND a."questionId" = q.id AND a."isCorrect" = false))
+          )
+          AND (NOT ${w.similarOn} OR q.id = ANY(${w.similarIds}))
+        )
+        OR (${w.focusOn} AND q.id = ${w.focusId}::text)
       )
-      AND (NOT ${w.similarOn} OR q.id = ANY(${w.similarIds}))
     ORDER BY
       (CASE ${sortKey}::text
          WHEN 'difficulty' THEN CASE qa.difficulty WHEN 'E' THEN 1 WHEN 'M' THEN 2 ELSE 3 END

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { smartSelect } from "@/actions/sets";
 import type { RawSetFilters } from "@/lib/query/generate-set";
 import type { SmartCandidate } from "@/lib/query/smart-select";
@@ -11,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Field, FieldLabel, FieldDescription } from "@/components/ui/field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Spinner } from "@/components/ui/spinner";
-import { SparkleIcon } from "@phosphor-icons/react";
+import { ArrowSquareOutIcon, SparkleIcon } from "@phosphor-icons/react";
 
 const DIFFICULTY_VARIANT = { E: "tag-green", M: "tag-yellow", H: "tag-red" } as const;
 
@@ -58,6 +59,21 @@ export function SmartSelectPanel({ filters, poolKey, prompt, onPromptChange, onS
       setNote(result.note || null);
       onSelectionChange(result.picks, nextSelected);
     });
+  }
+
+  // Same query shape as every other "open this question in the library"
+  // link in the app (buildSimilarHref in src/app/problems/page.tsx,
+  // practice-runner.tsx's "View similar problems") — pin assessment +
+  // section so the row's own facets resolve correctly, then `question=<id>`
+  // (browse-filters.ts's `focusId`) to land directly on that one question,
+  // pre-expanded, rather than a filtered listing.
+  function problemsHref(pick: SmartCandidate): string {
+    const qs = new URLSearchParams({
+      question: pick.questionId,
+      assessment: filters.assessment,
+      sections: pick.sectionCode,
+    });
+    return `/problems?${qs.toString()}`;
   }
 
   function toggle(questionId: string, checked: boolean) {
@@ -148,7 +164,18 @@ export function SmartSelectPanel({ filters, poolKey, prompt, onPromptChange, onS
                       {p.sectionCode} · {p.skillCode}
                     </span>
                   </div>
-                  <p className="truncate text-sm">{p.preview}</p>
+                  {/* Opens in a new tab, not the same one — /new carries a
+                      lot of in-progress state (filters, prompt, other
+                      picks) that navigating away would lose. */}
+                  <Link
+                    href={problemsHref(p)}
+                    target="_blank"
+                    className="group/open flex items-center gap-1 truncate text-sm hover:text-foreground hover:underline"
+                    title="Open in the question bank"
+                  >
+                    <span className="truncate">{p.preview}</span>
+                    <ArrowSquareOutIcon className="size-3.5 shrink-0 text-muted-foreground group-hover/open:text-foreground" />
+                  </Link>
                   <p className="text-xs text-muted-foreground italic">{p.reason}</p>
                 </div>
               </li>
