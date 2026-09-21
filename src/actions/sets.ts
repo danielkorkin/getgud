@@ -8,10 +8,15 @@ import { requireProfileId } from "@/lib/profile";
 import { isValidAssessment } from "@/lib/catalog";
 import {
   countMatchingQuestions,
+  listMatchingQuestions,
   sampleQuestions,
   validateSetFilters,
   type RawSetFilters,
+  type SampledQuestion,
 } from "@/lib/query/generate-set";
+import { hintsConfigured } from "@/lib/ai/hint-provider";
+import { similarSearchAvailable } from "@/lib/query/similar-questions";
+import { smartSelectQuestions, type SmartCandidate } from "@/lib/query/smart-select";
 
 export async function countMatching(raw: RawSetFilters): Promise<{ count: number } | { error: string }> {
   const validated = validateSetFilters(raw);
@@ -28,6 +33,68 @@ function defaultSetName(raw: RawSetFilters): string {
   return `${raw.assessment} · ${sections} · ${difficulty} · ${date}`;
 }
 
+interface InsertPracticeSetInput {
+  profileId: string;
+  name: string;
+  config: unknown;
+  assessment: string;
+  sectionCodes: string[];
+  difficulties: string[];
+  items: SampledQuestion[];
+}
+
+/**
+ * Shared PracticeSet + PracticeSetItem insert, used by every "generate a set
+ * from a resolved list of questions" path (createSet, createSmartSet). The
+ * per-item facet snapshot is what /stats depends on (see contract.prisma's
+ * comment above PracticeSetItem) — keeping this in one place is what stops
+ * that snapshot from drifting between callers.
+ */
+async function insertPracticeSet(input: InsertPracticeSetInput): Promise<string> {
+  const setId = crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  await db.transaction(async (tx) => {
+    await tx.orm.public.PracticeSet.create({
+      id: setId,
+      profileId: input.profileId,
+      name: input.name,
+      status: "in_progress",
+      mode: "practice",
+      config: toJsonValue(input.config),
+      assessment: input.assessment,
+      sectionCodes: input.sectionCodes,
+      difficulties: input.difficulties,
+      questionCount: input.items.length,
+      currentIndex: 0,
+      correctCount: 0,
+      gradedCount: 0,
+      totalActiveMs: 0,
+      createdAt: now,
+      startedAt: now,
+    });
+
+    for (const [index, q] of input.items.entries()) {
+      await tx.orm.public.PracticeSetItem.create({
+        id: crypto.randomUUID(),
+        setId,
+        position: index,
+        questionId: q.questionId,
+        assessment: input.assessment,
+        sectionCode: q.sectionCode,
+        domainCode: q.domainCode,
+        skillCode: q.skillCode,
+        difficulty: q.difficulty,
+        scoreBand: q.scoreBand,
+        type: q.type,
+        gradable: true,
+      });
+    }
+  });
+
+  return setId;
+}
+
 export async function createSet(
   raw: RawSetFilters,
   name?: string,
@@ -42,45 +109,98 @@ export async function createSet(
     return { error: "No questions match these filters. Try widening them." };
   }
 
-  const setId = crypto.randomUUID();
-  const now = new Date().toISOString();
+  const setId = await insertPracticeSet({
+    profileId,
+    name: (name ?? "").trim() || defaultSetName(raw),
+    config: filters,
+    assessment: filters.assessment,
+    sectionCodes: filters.sectionCodes,
+    difficulties: filters.difficulties,
+    items: sampled,
+  });
 
-  await db.transaction(async (tx) => {
-    await tx.orm.public.PracticeSet.create({
-      id: setId,
-      profileId,
-      name: (name ?? "").trim() || defaultSetName(raw),
-      status: "in_progress",
-      mode: "practice",
-      config: toJsonValue(filters),
-      assessment: filters.assessment,
-      sectionCodes: filters.sectionCodes,
-      difficulties: filters.difficulties,
-      questionCount: sampled.length,
-      currentIndex: 0,
-      correctCount: 0,
-      gradedCount: 0,
-      totalActiveMs: 0,
-      createdAt: now,
-      startedAt: now,
-    });
+  redirect(`/sets/${setId}`);
+}
 
-    for (const [index, q] of sampled.entries()) {
-      await tx.orm.public.PracticeSetItem.create({
-        id: crypto.randomUUID(),
-        setId,
-        position: index,
-        questionId: q.questionId,
-        assessment: filters.assessment,
-        sectionCode: q.sectionCode,
-        domainCode: q.domainCode,
-        skillCode: q.skillCode,
-        difficulty: q.difficulty,
-        scoreBand: q.scoreBand,
-        type: q.type,
-        gradable: true,
-      });
-    }
+// ─── Smart select (AI-assisted question search, src/lib/query/smart-select.ts) ─
+// A free-text description ("passages that are poems with figurative
+// language") searched for within the builder's existing filters, using this
+// app's embeddings plus one LLM re-rank call. Two actions: `smartSelect`
+// finds candidates for the preview list (nothing is written), and
+// `createSmartSet` builds the set from whichever picks the student kept.
+
+const MAX_PROMPT_CHARS = 500;
+
+export async function smartSelect(
+  raw: RawSetFilters,
+  prompt: string,
+): Promise<{ picks: SmartCandidate[]; note: string } | { error: string }> {
+  const trimmedPrompt = prompt.trim();
+  if (trimmedPrompt.length === 0) return { error: "Describe what you're looking for first." };
+  if (trimmedPrompt.length > MAX_PROMPT_CHARS) {
+    return { error: `Keep the description under ${MAX_PROMPT_CHARS} characters.` };
+  }
+
+  const validated = validateSetFilters(raw);
+  if (!validated.ok) return { error: validated.error };
+
+  if (!hintsConfigured()) {
+    return { error: "Smart select isn't configured — set OPENROUTER_API_KEY to enable it." };
+  }
+  if (!(await similarSearchAvailable())) {
+    return { error: "Smart select needs question embeddings — run `pnpm embed` first." };
+  }
+
+  const profileId = await requireProfileId();
+  const result = await smartSelectQuestions(validated.filters, profileId, trimmedPrompt);
+  if ("error" in result) return result;
+  return { picks: result.picks, note: result.note };
+}
+
+function defaultSmartSetName(prompt: string): string {
+  const date = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const trimmed = prompt.length > 40 ? prompt.slice(0, 40) + "…" : prompt;
+  return `Smart · ${trimmed} · ${date}`;
+}
+
+export async function createSmartSet(
+  raw: RawSetFilters,
+  prompt: string,
+  questionIds: string[],
+  name?: string,
+): Promise<{ error: string } | void> {
+  const validated = validateSetFilters(raw);
+  if (!validated.ok) return { error: validated.error };
+  const filters = validated.filters;
+
+  const profileId = await requireProfileId();
+
+  // Re-derive the pool server-side rather than trusting the client's id
+  // list — the same rule getOwnedItem enforces elsewhere ("no password
+  // profiles are still not no authorization"), and it also protects against
+  // a stale preview building a set with a question the current filters no
+  // longer match.
+  const pool = await listMatchingQuestions(filters, filters.excludeAttempted ? profileId : null);
+  const poolById = new Map(pool.map((q) => [q.questionId, q]));
+
+  const uniqueIncoming = [...new Set(questionIds)];
+  const items: SampledQuestion[] = [];
+  for (const id of uniqueIncoming) {
+    const q = poolById.get(id);
+    if (q) items.push(q);
+  }
+  if (items.length === 0) {
+    return { error: "None of the selected questions matched your current filters — search again." };
+  }
+
+  const setId = await insertPracticeSet({
+    profileId,
+    name: (name ?? "").trim() || defaultSmartSetName(prompt),
+    config: { kind: "smart", prompt, filters },
+    assessment: filters.assessment,
+    sectionCodes: filters.sectionCodes,
+    difficulties: filters.difficulties,
+    items,
   });
 
   redirect(`/sets/${setId}`);

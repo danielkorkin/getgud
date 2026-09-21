@@ -184,7 +184,13 @@ export async function countMatchingQuestions(filters: SetFilters, profileId: str
   return row?.n ?? 0;
 }
 
-export async function sampleQuestions(
+/**
+ * Every question matching `filters` — the pool `sampleQuestions` draws from,
+ * unordered and unlimited. Exposed separately (rather than only ever LIMITed)
+ * for "Smart select" (src/lib/query/smart-select.ts), which needs the full
+ * matching pool to search/re-rank within before it ever samples a count.
+ */
+export async function listMatchingQuestions(
   filters: SetFilters,
   profileId: string | null,
 ): Promise<SampledQuestion[]> {
@@ -214,8 +220,6 @@ export async function sampleQuestions(
         NOT ${w.excludeAttempted}
         OR NOT EXISTS (SELECT 1 FROM attempt a WHERE a."profileId" = ${w.profileId} AND a."questionId" = q.id)
       )
-    ORDER BY random()
-    LIMIT ${filters.questionCount}
   `
     .returnsRow({
       questionId: "pg/text@1",
@@ -229,4 +233,21 @@ export async function sampleQuestions(
     })
     .build();
   return db.runtime().query(plan);
+}
+
+/** Fisher-Yates in place — used to turn the full matching pool into a random sample. */
+function shuffle<T>(items: T[]): T[] {
+  for (let i = items.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [items[i], items[j]] = [items[j], items[i]];
+  }
+  return items;
+}
+
+export async function sampleQuestions(
+  filters: SetFilters,
+  profileId: string | null,
+): Promise<SampledQuestion[]> {
+  const pool = await listMatchingQuestions(filters, profileId);
+  return shuffle(pool).slice(0, filters.questionCount);
 }

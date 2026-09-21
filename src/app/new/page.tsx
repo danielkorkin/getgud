@@ -1,11 +1,18 @@
 import { redirect } from "next/navigation";
 import { getCurrentProfile } from "@/lib/profile";
+import { hintsConfigured } from "@/lib/ai/hint-provider";
+import { similarSearchAvailable } from "@/lib/query/similar-questions";
 import { SetBuilderForm } from "@/components/set-builder/set-builder-form";
 import { SiteNav } from "@/components/site-nav";
 
 export default async function NewSetPage() {
   const profile = await getCurrentProfile();
   if (!profile) redirect("/");
+
+  // Same gating precedent as "View similar problems" — hidden entirely
+  // rather than shown-and-erroring when OPENROUTER_API_KEY isn't set or
+  // `pnpm embed` hasn't populated the embedding table yet.
+  const smartAvailable = hintsConfigured() && (await similarSearchAvailable());
 
   return (
     <>
@@ -15,7 +22,7 @@ export default async function NewSetPage() {
           <span className="text-xs tracking-[0.05em] text-muted-foreground uppercase">New practice set</span>
           <h1 className="text-4xl font-medium tracking-tight">Build your set</h1>
         </div>
-        <SetBuilderForm />
+        <SetBuilderForm smartAvailable={smartAvailable} />
       </div>
     </>
   );

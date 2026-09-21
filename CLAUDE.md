@@ -43,11 +43,17 @@ questions into a set; and, layered on top of that browser, an optional
 "View similar problems" (`pnpm embed` populates a per-question embedding
 table, gated off entirely when it hasn't been run) that re-ranks the same
 browser by content similarity from any question, reachable from `/problems`
-itself, the post-answer feedback in the runner, and the set results page.
-See "Practice-tool app layer" below for the data model and load-bearing
-gotchas, "Premade exams" for the exam system specifically, "Problems
-database" for the browser, "Similar problems (embeddings)" for that
-feature, and "Statistics & AI analysis" for `/stats`.
+itself, the post-answer feedback in the runner, and the set results page;
+and, in the `/new` builder itself, "Smart select" — a free-text prompt
+("passages that are poems with figurative language") that searches the bank
+for matching questions within whatever facets are already chosen, using
+those same embeddings plus one LLM re-rank call, previewed with a reason
+per pick before anything is built. See "Practice-tool app layer" below for
+the data model and load-bearing gotchas, "Premade exams" for the exam
+system specifically, "Problems database" for the browser, "Similar
+problems (embeddings)" for that feature, "Smart select (AI question
+search)" for the builder prompt, and "Statistics & AI analysis" for
+`/stats`.
 
 ## Commands
 
@@ -705,6 +711,88 @@ as noise.
 hood, so exam-reserved and no-published-answer questions remain browsable
 here exactly as they are in plain browse mode; see "Problems database"
 above.
+
+## Smart select (AI question search)
+
+A free-text prompt in the `/new` set builder ("passages that are poems with
+figurative language," "semicolon joining two independent clauses") that
+searches for questions matching it *within* whatever facets are already
+chosen, using this app's embeddings (same table "View similar problems"
+reads) plus one LLM re-rank call — `src/lib/query/smart-select.ts`'s
+`smartSelectQuestions`, called from `src/actions/sets.ts`'s `smartSelect`
+(search) and `createSmartSet` (build). The builder previews picks with a
+one-line reason each before anything is written — never builds straight
+from the AI's output.
+
+**Pipeline**: `listMatchingQuestions` (a new export on `generate-set.ts` —
+the same WHERE clause `sampleQuestions` uses, with `ORDER BY random() LIMIT`
+removed, so it returns the *whole* matching pool) → if the pool already fits
+within `rerankCandidateCount(questionCount)` (`similar-questions.ts`, scales
+48–120 with the requested length), skip retrieval and re-rank the whole pool
+directly; otherwise embed the user's prompt and call the new
+`rankByVector`/`EmbeddingIndex.topKForVector` (an `allow`-set-restricted
+sibling of the existing `topK`, sharing a private `scan` method with it) to
+narrow the pool to that candidate count → hydrate candidate content →
+one `generateObject` call (`smart-select-prompt.ts` + `smart-select-schema.ts`)
+picks among the candidates by 1-based index, dropping any hallucinated or
+out-of-range index. **This inherits `/new`'s reserved/ungradable policy, not
+`/problems`'** — `listMatchingQuestions` shares `generate-set.ts`'s
+`buildWhereFragment`, so `RESERVED_QUESTION_IDS` and the
+`cardinality(correctAnswer) > 0` gate apply here exactly as they do to plain
+random sampling (the opposite of "Similar problems"' policy, which
+deliberately inherits `/problems`' more permissive one — see above).
+
+**Not HyDE.** An earlier version embedded an LLM-written synthetic exemplar
+passage instead of the user's own prompt text — measured in
+`scripts/probe-hyde.ts` before this shipped, and dropped: on Reading & Writing
+style/register prompts ("Shakespearean English," "semicolon joining two
+independent clauses"), the synthetic exemplar's embedding spuriously
+collided with bare Math equations at a *higher* cosine than any genuine
+match — likely because those Math items' embedding text is a short, sparse
+equation with no prose. Embedding the user's own prompt directly never
+showed that failure across 6 test prompts spanning both sections, so that's
+what ships. See the script's file comment for the full record if this needs
+re-litigating (e.g. after an embedding model change).
+
+**Every reason is generated with no access to `rationale` or
+`correctAnswer`, and the prompt explicitly forbids referencing either** —
+picks are shown to the student *before* they practice the set, so leaking an
+answer here would spoil the question the same way it would in `/api/coach`
+before an attempt is answered.
+
+**`createSmartSet` re-derives the pool server-side and intersects it with
+the client's id list rather than trusting the ids directly** — same
+"no-password profiles are still not no authorization" reasoning as
+`getOwnedItem` elsewhere, and it also means a stale preview (filters changed
+after searching, tab left open) can't insert a question the current filters
+no longer match. A shortfall is honest: fewer genuine matches than requested
+builds a smaller set rather than padding with random or merely-similar
+questions — the schema's `note` field is exactly the escape hatch for "not
+enough" or "none of these really match."
+
+**`PracticeSet.config` gains a fourth shape**: `{ kind: "smart", prompt,
+filters }`, alongside `SetFilters`, `{ kind: "manual" }` (see "Problems
+database"), and `{ examId }` (see `exams.ts`). Only `/problems/page.tsx`
+reads the discriminator, and only for `kind === "manual"`, so a smart-built
+set correctly never shows up there as a hand-picked draft.
+
+**Uses `getAnalysisModel()`, not `getCoachModel()`** — reasoning is left at
+the provider default rather than disabled, since re-ranking candidates
+against a free-text description is closer to `analyzeStats`'s one-shot
+judgment call than to a latency-sensitive per-question tutor reply.
+
+**The set-builder form's `poolKey` (which invalidates Smart select's picks
+on a real filter change) sorts every array field before stringifying it.**
+A `ToggleGroup`'s `onValueChange` reports newly-selected values in
+click/toggle order, not canonical order — deselecting and reselecting the
+same difficulty can silently reorder its array (`["E","M","H"]` ->
+`["H","E","M"]`) with the matching pool completely unchanged. An unsorted
+`JSON.stringify` key would treat that as a real filter change and needlessly
+throw away a perfectly valid picks list; sorting first makes the key track
+the actual *set* of selected values. `filtersKey` (the sibling key driving
+the live "N questions match" count) is left unsorted on purpose — that
+effect just re-fetches on any key change, so the same reordering only costs
+a redundant request there, never a correctness problem.
 
 ## Learn section (resources + guides)
 

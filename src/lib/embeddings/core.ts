@@ -153,36 +153,73 @@ export class EmbeddingIndex {
     return this.ids.length;
   }
 
+  get dimension(): number {
+    return this.dim;
+  }
+
   has(id: string): boolean {
     return this.rowOf.has(id);
+  }
+
+  /**
+   * Shared linear scan: dot product of `query` against every row (unit
+   * vectors ⇒ cosine = dot), keeping the top `limit` via a small array kept
+   * min-first (re-sorted on each displacement — fine at limit ≤ ~200, a real
+   * heap isn't worth the complexity here). `skipRow`, when given, excludes
+   * that single row index (used by `topK` to exclude the query question
+   * itself). `allow`, when given, restricts the scan to ids in that set —
+   * needed by `topKForVector` so a query vector can be ranked against a
+   * caller-chosen pool rather than the whole corpus.
+   */
+  private scan(
+    query: Float32Array,
+    limit: number,
+    skipRow: number | null,
+    allow: ReadonlySet<string> | null,
+  ): SimilarityHit[] {
+    const { matrix, dim, ids } = this;
+    const heap: SimilarityHit[] = [];
+
+    for (let i = 0; i < ids.length; i++) {
+      if (i === skipRow) continue;
+      if (allow !== null && !allow.has(ids[i])) continue;
+
+      const otherBase = i * dim;
+      let dot = 0;
+      for (let d = 0; d < dim; d++) dot += query[d] * matrix[otherBase + d];
+
+      if (heap.length < limit) {
+        heap.push({ id: ids[i], score: dot });
+        if (heap.length === limit) heap.sort((a, b) => a.score - b.score);
+      } else if (heap.length > 0 && dot > heap[0].score) {
+        heap[0] = { id: ids[i], score: dot };
+        heap.sort((a, b) => a.score - b.score);
+      }
+    }
+
+    return heap.sort((a, b) => b.score - a.score);
   }
 
   /** Top-`limit` most similar ids to `id`, excluding `id` itself, descending by score. */
   topK(id: string, limit: number): SimilarityHit[] {
     const row = this.rowOf.get(id);
     if (row === undefined) return [];
+    const base = row * this.dim;
+    return this.scan(this.matrix.subarray(base, base + this.dim), limit, row, null);
+  }
 
-    const { matrix, dim, ids } = this;
-    const base = row * dim;
-    const heap: SimilarityHit[] = [];
-
-    for (let i = 0; i < ids.length; i++) {
-      if (i === row) continue;
-      const otherBase = i * dim;
-      let dot = 0;
-      for (let d = 0; d < dim; d++) dot += matrix[base + d] * matrix[otherBase + d];
-
-      if (heap.length < limit) {
-        heap.push({ id: ids[i], score: dot });
-        if (heap.length === limit) heap.sort((a, b) => a.score - b.score);
-      } else if (dot > heap[0].score) {
-        heap[0] = { id: ids[i], score: dot };
-        // Small `limit` (≤200) — re-sort is cheap; a real heap isn't worth the complexity here.
-        heap.sort((a, b) => a.score - b.score);
-      }
+  /**
+   * Top-`limit` most similar ids to an arbitrary query vector (e.g. an
+   * embedded free-text prompt), optionally restricted to `allow` — used by
+   * "Smart select" to rank a prompt's embedding against just the ids that
+   * already match a practice-set builder's filters, not the whole bank.
+   * Throws if `query`'s dimension doesn't match the index's.
+   */
+  topKForVector(query: Float32Array, limit: number, allow?: ReadonlySet<string>): SimilarityHit[] {
+    if (query.length !== this.dim) {
+      throw new Error(`Query vector has dimension ${query.length}, expected ${this.dim}.`);
     }
-
-    return heap.sort((a, b) => b.score - a.score);
+    return this.scan(query, limit, null, allow ?? null);
   }
 }
 

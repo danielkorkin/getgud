@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { createSet, countMatching } from "@/actions/sets";
+import { createSet, createSmartSet, countMatching } from "@/actions/sets";
 import type { RawSetFilters } from "@/lib/query/generate-set";
 import {
   ASSESSMENTS,
@@ -25,8 +25,9 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/component
 import { Field, FieldGroup, FieldLabel, FieldDescription, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CaretDownIcon } from "@phosphor-icons/react";
+import { SmartSelectPanel } from "@/components/set-builder/smart-select-panel";
 
-export function SetBuilderForm() {
+export function SetBuilderForm({ smartAvailable = false }: { smartAvailable?: boolean }) {
   const [assessment, setAssessment] = useState<Assessment>(ASSESSMENTS[0].value);
   const [sectionCodes, setSectionCodes] = useState<SectionCode[]>(SECTIONS.map((s) => s.code));
   const [difficulties, setDifficulties] = useState<Difficulty[]>(DIFFICULTIES.map((d) => d.code));
@@ -40,6 +41,16 @@ export function SetBuilderForm() {
   const [resolvedCount, setResolvedCount] = useState<{ key: string; count: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  // Smart select state — kept separate from the plain "Build set" flow.
+  // smartSelected is the source of truth for what gets built, but only
+  // while smartSelectedKey still matches the current pool — derived below
+  // (once poolKey exists), not cleared via an effect (same "derived, not
+  // eagerly set" idiom as countLoading/count below, which avoids a
+  // react-hooks/set-state-in-effect cascade).
+  const [smartPrompt, setSmartPrompt] = useState("");
+  const [smartSelected, setSmartSelected] = useState<ReadonlySet<string>>(new Set());
+  const [smartSelectedKey, setSmartSelectedKey] = useState<string | null>(null);
 
   const availableDomains = useMemo(
     () => sectionCodes.flatMap((s) => domainsForSection(s)),
@@ -70,6 +81,27 @@ export function SetBuilderForm() {
     questionCount,
   };
   const filtersKey = JSON.stringify(filters);
+  // Everything that changes the matching POOL, deliberately omitting
+  // questionCount — used to invalidate Smart select's picks. filtersKey
+  // above stays as-is for the live count effect below (it's supposed to
+  // re-fetch when the length slider moves; the picks list isn't).
+  //
+  // Array fields are sorted before stringifying: a ToggleGroup's
+  // onValueChange reports newly-selected values in click/toggle order, not
+  // canonical order, so deselecting and reselecting the same difficulty (or
+  // any other multi-select) can silently reorder its array — e.g.
+  // ["E","M","H"] -> ["H","E","M"] — with the matching pool completely
+  // unchanged. A plain JSON.stringify would treat that as a real filter
+  // change and needlessly invalidate the picks; sorting first makes the key
+  // reflect the actual SET of values, not the order they were clicked in.
+  const poolKey = JSON.stringify(
+    { ...filters, questionCount: undefined },
+    (key, value) => (Array.isArray(value) ? [...value].sort() : value),
+  );
+  const effectiveSmartSelected = useMemo(
+    () => (smartSelectedKey === poolKey ? smartSelected : new Set<string>()),
+    [smartSelectedKey, poolKey, smartSelected],
+  );
 
   // Derived, not eagerly set — the effect below only writes on actual
   // resolution, so there's no synchronous setState at the top of the
@@ -90,6 +122,7 @@ export function SetBuilderForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtersKey]);
 
+
   function toggleDomain(code: string, checked: boolean) {
     setDeselectedDomains((prev) => {
       const next = new Set(prev);
@@ -108,10 +141,21 @@ export function SetBuilderForm() {
     });
   }
 
+  // Re-cap (never re-run) the current selection to the live question count —
+  // moving the length slider down after a search shouldn't silently build a
+  // larger set than the slider now shows.
+  const cappedSmartSelected = useMemo(
+    () => new Set([...effectiveSmartSelected].slice(0, questionCount)),
+    [effectiveSmartSelected, questionCount],
+  );
+
   function handleSubmit() {
     setError(null);
     startTransition(async () => {
-      const result = await createSet(filters, name);
+      const result =
+        cappedSmartSelected.size > 0
+          ? await createSmartSet(filters, smartPrompt, [...cappedSmartSelected], name)
+          : await createSet(filters, name);
       if (result?.error) setError(result.error);
     });
   }
@@ -217,6 +261,19 @@ export function SetBuilderForm() {
         </Accordion>
       </FieldSet>
 
+      {smartAvailable && (
+        <SmartSelectPanel
+          filters={filters}
+          poolKey={poolKey}
+          prompt={smartPrompt}
+          onPromptChange={setSmartPrompt}
+          onSelectionChange={(_picks, selected) => {
+            setSmartSelected(selected);
+            setSmartSelectedKey(poolKey);
+          }}
+        />
+      )}
+
       <Collapsible>
         <CollapsibleTrigger className="group flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground">
           <CaretDownIcon className="size-4 transition-transform group-aria-expanded:rotate-180" />
@@ -307,19 +364,32 @@ export function SetBuilderForm() {
       <Card>
         <CardHeader>
           <CardTitle className="font-mono text-2xl">
-            {countLoading ? "…" : count ?? 0}
+            {cappedSmartSelected.size > 0 ? cappedSmartSelected.size : countLoading ? "…" : (count ?? 0)}
           </CardTitle>
           <CardDescription>
-            matching question{count === 1 ? "" : "s"} in the bank
-            {count !== null && count < questionCount && !countLoading && (
-              <span className="text-destructive"> — fewer than the {questionCount} requested</span>
+            {cappedSmartSelected.size > 0 ? (
+              "smart-selected question" + (cappedSmartSelected.size === 1 ? "" : "s") + " kept"
+            ) : (
+              <>
+                matching question{count === 1 ? "" : "s"} in the bank
+                {count !== null && count < questionCount && !countLoading && (
+                  <span className="text-destructive"> — fewer than the {questionCount} requested</span>
+                )}
+              </>
             )}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {error && <p className="text-sm text-destructive">{error}</p>}
-          <Button onClick={handleSubmit} disabled={pending || countLoading || (count ?? 0) === 0}>
-            {pending ? "Building…" : "Build set"}
+          <Button
+            onClick={handleSubmit}
+            disabled={pending || (cappedSmartSelected.size === 0 && (countLoading || (count ?? 0) === 0))}
+          >
+            {pending
+              ? "Building…"
+              : cappedSmartSelected.size > 0
+                ? `Build set (${cappedSmartSelected.size})`
+                : "Build set"}
           </Button>
         </CardContent>
       </Card>

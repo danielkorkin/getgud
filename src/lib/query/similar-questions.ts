@@ -67,3 +67,31 @@ export async function rankSimilar(questionId: string, limit: number = SIMILAR_PO
   if (!index.has(questionId)) return [];
   return index.topK(questionId, limit);
 }
+
+/**
+ * Ranked matches for an arbitrary query vector (e.g. an embedded free-text
+ * prompt from "Smart select"), restricted to `allow` — the set of question
+ * ids that already match a practice-set builder's filters. `query` must be
+ * L2-normalized to the same convention every stored vector uses (cosine =
+ * plain dot product); see src/lib/query/smart-select.ts for the caller.
+ */
+export async function rankByVector(
+  query: Float32Array,
+  allow: ReadonlySet<string>,
+  limit: number,
+): Promise<SimilarityHit[]> {
+  const index = await getIndex();
+  if (index.size === 0) return [];
+  return index.topKForVector(query, limit, allow);
+}
+
+/**
+ * How many candidates "Smart select" should re-rank with an LLM, scaled to
+ * the requested set size — a fixed cap would either starve a large request
+ * (a 30-question ask re-ranked from only 48 candidates) or make the slider's
+ * max (50) impossible to fill even when the pool has plenty of good matches.
+ * Capped at 120 to keep the re-rank prompt's token cost bounded.
+ */
+export function rerankCandidateCount(questionCount: number): number {
+  return Math.min(120, Math.max(48, questionCount * 3));
+}
