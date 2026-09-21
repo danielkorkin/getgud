@@ -25,12 +25,16 @@ export const RecommendedSetSchema = z.object({
 });
 
 export const AnalysisSchema = z.object({
-  summary: z.string().min(1).max(600),
+  summary: z.string().min(1).max(800),
   recommendedSets: z.array(RecommendedSetSchema).min(1).max(3),
   // Required (not `.default([])`) for the same reason as `difficulties`
   // above — an empty array is a valid, always-supplied "no pattern found"
-  // answer rather than an omitted optional field.
-  troubleSpots: z.array(z.string().min(1).max(200)).max(5),
+  // answer rather than an omitted optional field. Longer/more numerous than
+  // the original cap — these are now expected to name precise content
+  // patterns (a passage genre/era, a specific trap-answer type, a recurring
+  // math structure), not just one-line conceptual notes from chat, so they
+  // need more room to be concrete rather than generic.
+  troubleSpots: z.array(z.string().min(1).max(280)).max(8),
 });
 
 export type RecommendedSet = z.infer<typeof RecommendedSetSchema>;

@@ -1,10 +1,13 @@
 // Server-only. Builds the prompt for the one-shot "analyze my performance"
 // call (src/actions/stats.ts). Mirrors coach-prompt.ts's shape: pure, no
-// I/O, typed input in, prompt out. Only ever fed an already-aggregated
-// summary (a few dozen numbers/strings), never raw Attempt rows — the
-// aggregation in src/lib/stats/aggregate.ts already collapsed a profile's
-// entire history before this point, so the prompt stays small regardless
-// of how much history exists.
+// I/O, typed input in, prompt out. Fed two kinds of input: an
+// already-aggregated numeric summary (a few dozen numbers/strings, from
+// src/lib/stats/aggregate.ts, which stays small regardless of history
+// length) plus a bounded, truncated sample of real question content
+// (src/lib/stats/question-details.ts) — passage/stem/choices text, not raw
+// Attempt rows — so the model can name content-level patterns (a passage
+// genre/era, a specific trap-answer type) that no amount of skill-code
+// accuracy aggregation can surface on its own.
 import "server-only";
 
 import type { QuestionDetails } from "@/lib/stats/question-details";
@@ -54,13 +57,34 @@ export interface StatsSummaryInput {
 
 const SYSTEM_RULES = [
   "You are an SAT/PSAT tutor analyzing a student's full practice history to write a short performance summary and recommend targeted practice sets.",
-  "Base every claim strictly on the data given — never invent a skill, score, or number not present in it.",
+  "Base every claim strictly on the data given — never invent a skill, score, number, passage detail, or question not present in it.",
   "The summary must be 2-4 plain-text sentences: no markdown, no bullet lists, no LaTeX.",
+
+  // Precision mandate — the single most important instruction, stated
+  // up front and reinforced by every rule below it. Written the way it is
+  // (naming the exact banned phrasing) because a generic tutoring model
+  // defaults to exactly these restatements unless explicitly told not to.
+  "Precision is the whole point of this analysis: every claim, in the summary and in troubleSpots alike, must be specific enough that the student would immediately recognize which exact questions you mean. Never write a vague, generic restatement of an accuracy number — banned phrasing includes things like \"needs to work on reading comprehension,\" \"should practice algebra more,\" \"struggles with grammar rules,\" or \"could improve pacing.\" Instead name the precise skill AND, whenever the question content supports it, the precise kind of question: the passage's genre/era/style, the specific trap-answer pattern, or the specific mathematical structure involved.",
+
   "Recommend 1-3 practice sets, each targeting skills where the data shows real weakness (lower accuracy) or a pacing concern (correct but notably slow, or wrong and notably rushed) with reasonable sample size — do not recommend a skill with fewer than 3 graded questions.",
-  "Each recommended set's skillCodes must come only from the skill codes listed in the data below — never invent a code.",
+  "Each recommended set's skillCodes must come only from the skill codes listed in the data below — never invent a code. Its rationale field must name the specific pattern driving the recommendation (per the precision mandate above), not a generic \"improve your accuracy in X\" line.",
   "The summary isn't limited to skill accuracy — if a behavioral pattern (calculator/reference-sheet usage, marking questions for review, time of day, or a recent trend) is the most notable signal in the data, lead with that instead of a generic accuracy restatement.",
-  "If past coach-chat excerpts are provided, read them for recurring conceptual trouble — the same kind of confusion or misunderstanding showing up across more than one conversation, not a one-off question. List each such pattern as a short phrase (under 15 words) naming the specific confusion, e.g. \"mixes up correlation and causation in scatterplot questions\" — not a restatement of an accuracy number. Return an empty list if the excerpts don't show a repeated pattern, or if none are provided.",
-  "Below the aggregated numbers, actual recent questions are included verbatim — passage/stem, choices, the student's own answer, and the correct answer — a batch of recent wrong answers plus a smaller batch of recent correct ones for contrast. Read these for content-level patterns a skill-code breakdown can't show: the same kind of trap answer chosen more than once, a specific phrasing or question format (e.g. dual-passage, graph-reading, a particular kind of algebraic setup) that recurs among the misses. Only report such a pattern — in the summary or as a trouble spot — if it actually recurs across more than one of the shown questions; a single missed question is never a pattern.",
+
+  // Content-pattern detection — this is what the raw question text below is
+  // *for*. Spelled out with concrete example categories (matching what a
+  // student would actually call "poems" or "old English") because a model
+  // told only "look for patterns" tends to default back to skill codes,
+  // which is exactly the gap this data was added to close.
+  "Below the aggregated numbers, actual recent questions are included verbatim: passage text, the question stem, every answer choice, the student's own answer, the correct answer, and — for wrong answers — the official rationale. Read these directly; they exist because the SAT's own skill/domain codes (e.g. \"Craft and Structure\") describe *what skill* is being tested, never *what kind of passage or problem* it is, so a real content pattern is only visible by reading the text itself.",
+  "For Reading & Writing misses specifically, actively check whether the passages share a genre, era, or prose style you can identify from the wording itself — for example: pre-20th-century literary prose or poetry, recognizable by inverted syntax, archaic or unusually formal vocabulary, or verse line-breaks (what a student typically calls \"old English\" even when it's really 18th/19th-century English rather than literally Old English); primary-source historical, political, or legal documents; dense scientific or research-summary writing; satirical or ironic tone; or a dual-passage synthesis format. If two or more missed passages clearly share such a trait, name it explicitly and concretely — e.g. \"loses accuracy on pre-1900 literary passages with inverted sentence structure\" — rather than only citing the domain code.",
+  "For Math misses, likewise check whether the stems/choices share a problem structure beyond just difficulty or domain — e.g. multi-step word problems with real-world framing, systems of equations, a data table or graph described in the stem, unit conversion, a particular function notation, or a geometry setup — and name that structure specifically when it recurs.",
+  "When a wrong answer's official rationale is included, use it to identify the specific reasoning error, not just that the student got it wrong — e.g. picked a choice that restates a supporting detail instead of the passage's main claim, picked a choice that is factually true but doesn't answer what was asked, or made a specific algebraic misstep. Only claim a reasoning-trap type recurs if you see the same type across more than one of the shown rationales.",
+  "Use the sample of correctly-answered questions as a control, not just padding: if the student handles the same genre/era or skill correctly elsewhere in the sample, don't claim a genre/era weakness — narrow the claim to what's actually different about the missed ones instead (a specific sub-skill, difficulty, or trap type).",
+  "Never report a content pattern — genre, era, trap type, or math structure — unless it actually recurs across more than one of the shown questions; a single missed question is never a pattern, no matter how notable it looks.",
+
+  "If past coach-chat excerpts are provided, read them for recurring conceptual trouble — the same kind of confusion or misunderstanding showing up across more than one conversation, not a one-off question.",
+  "troubleSpots should combine BOTH sources above: recurring conceptual trouble from past coach chats, and recurring content patterns (genre/era/style, trap-answer type, math structure) from the raw question examples. Each entry is one specific, concrete sentence (not a phrase) naming the pattern precisely enough to picture the exact questions it describes — e.g. \"Mixes up correlation and causation in scatterplot questions\" or \"Consistently picks the choice that restates a supporting detail instead of the passage's main claim in 18th/19th-century literary excerpts.\" Return an empty list only if neither source shows any repeated pattern.",
+
   "Pacing concerns and rushed mistakes are real weaknesses even on skills with fine accuracy — a skill the student gets right but consistently too slowly is worth a timed-drilling recommendation, and a skill where wrong answers come in unusually fast is worth flagging as a carelessness pattern, not a knowledge gap.",
 ];
 
@@ -75,6 +99,7 @@ function formatQuestionDetail(q: QuestionDetails["wrong"][number], index: number
     `Prompt: ${q.stem}`,
     q.options ? `Choices:\n${q.options.join("\n")}` : null,
     `Student answered: ${q.studentAnswer}. Correct answer: ${q.correctAnswer}.`,
+    q.rationale ? `Official explanation: ${q.rationale}` : null,
   ]
     .filter((line): line is string => line !== null)
     .join("\n");
@@ -185,9 +210,9 @@ export function buildRecommendationPrompt(input: StatsSummaryInput): { system: s
     insightLines,
     "\nExcerpts from past post-answer coach conversations (most recent first):",
     chatLines,
-    "\nRecent questions answered WRONG, with full content (read for content-level patterns, not just the skill code):",
+    "\nRecent questions answered WRONG, with full passage/choice content and (where available) the official rationale — read these directly for genre/era/style and trap-answer patterns, not just the skill code:",
     wrongQuestionLines,
-    "\nA sample of recent questions answered CORRECTLY, for contrast:",
+    "\nA sample of recent questions answered CORRECTLY, for contrast (use to rule out a genre/skill weakness the student actually handles fine elsewhere):",
     correctQuestionLines,
   ].join("\n");
 

@@ -199,6 +199,19 @@ not just a coverage change, and check for that failure mode (a real English
 word landing untranslated in the LaTeX output) before widening what the
 grammar accepts.
 
+`scripts/lib/html.ts`'s `decodeHtmlEntities` (shared by every plain-text
+consumer, including `toPlainText`'s hint/coach/stats AI prompts) only ever
+decoded a hand-picked set of named entities — any named entity missing from
+`NAMED_ENTITIES` was silently passed through verbatim rather than decoded,
+which for a while meant real content shipped into an LLM prompt as, e.g.,
+literal `"Medell&iacute;n"` instead of `"Medellín"`. Found via a scan of the
+actual bank's `stem`/`stimulus`/`rationale`/`answerOptions` text for every
+`&word;`-shaped entity; the table now covers what that scan found (accented
+Latin letters, `copy`, `micro`, curly-quote/dash variants, etc.) plus each
+letter's missing case pair. If you see an untranslated `&xyz;` in rendered
+or AI-prompt text again, the fix is here, not in the caller — add the
+missing entry rather than special-casing the caller.
+
 ## Practice-tool app layer
 
 Server Actions live in `src/actions/` (`profile.ts`, `sets.ts`,
@@ -789,18 +802,24 @@ computation and I/O:**
   `Attempt`/`PracticeSet`/`ExamSession` queries and calls `buildStatsBundle`;
   `loadChatExcerpts(profileId)` separately pulls the 8 most recent non-empty
   `Attempt.chatMessages` conversations (truncated per-conversation);
-  `loadQuestionDetails(profileId)` separately pulls the 15 most recent wrong
-  attempts plus 8 most recent correct ones, joined by hand to their
+  `loadQuestionDetails(profileId)` separately pulls the 25 most recent wrong
+  attempts plus 12 most recent correct ones, joined by hand to their
   `Question` row (this ORM has no relation `.include()` used anywhere else
   in the app, so this follows the existing two-query-and-join-in-JS pattern
   from `access.ts`/`attempts.ts` rather than introducing a new one) and
-  truncated per-field (stimulus/stem to 280 chars, each choice to 120) —
-  real question content for the AI to read directly, not just facet codes,
-  so it can notice a content-level pattern (a recurring trap answer, a
-  phrasing, a question format) that an accuracy-by-skill-code breakdown
-  can't show. Only `analyzeStats()` reads this one (unlike the other two,
-  `/stats`'s own page never needs raw question text). All three are called
-  by `src/app/stats/page.tsx` and/or `src/actions/stats.ts` rather than
+  truncated per-field (stimulus to 900 chars — the bank's 90th-percentile
+  stimulus length, chosen so the truncation only bites the rare
+  multi-thousand-char outlier rather than cutting off a typical passage
+  before any genre/era signal appears; stem to 400; each choice to 200; the
+  official rationale, wrong answers only, to 300) — real question content
+  for the AI to read directly, not just facet codes, so it can notice a
+  content-level pattern (a passage genre/era/style like "pre-20th-century
+  literary prose," a recurring trap-answer type, a math problem structure)
+  that an accuracy-by-skill-code breakdown can't show, since the SAT's own
+  skill/domain taxonomy has no code for any of that. Only `analyzeStats()`
+  reads this one (unlike the other two, `/stats`'s own page never needs raw
+  question text). All three are called by `src/app/stats/page.tsx` and/or
+  `src/actions/stats.ts` rather than
   querying directly, so the page and the AI prompt never drift out of sync
   on what "the stats" are.
 - `src/lib/ai/stats-prompt.ts` / `stats-schema.ts` / `src/actions/stats.ts` —

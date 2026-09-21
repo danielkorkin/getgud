@@ -65,7 +65,7 @@ export function AnalysisPanel() {
                   <ChatsCircleIcon className="size-4 text-muted-foreground" />
                   <CardTitle className="text-base">Recurring trouble spots</CardTitle>
                 </div>
-                <CardDescription>Patterns noticed across your past coach conversations.</CardDescription>
+                <CardDescription>Specific patterns noticed in your missed questions and past coach conversations.</CardDescription>
               </CardHeader>
               <CardContent>
                 <ul className="flex flex-col gap-1.5 text-sm">
