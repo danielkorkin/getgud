@@ -50,9 +50,16 @@ marked-for-review) patterns, and exam score history, each paired with
 plain-English insights so the charts come with a takeaway, not just numbers.
 An "Analyze my performance" button sends a summary of all of that — plus a
 read of your past post-answer coach conversations, looking for a
-misunderstanding that keeps recurring — to the AI for a short written
+misunderstanding that keeps recurring, and a sample of your actual recent
+questions (passage, choices, your answer, the correct one) so it can spot
+content-level patterns like a recurring passage style or trap-answer type
+that a skill-code breakdown alone can't show — to the AI for a short written
 analysis and 1-3 recommended practice sets, each one clickable straight into
-a real, ready-to-answer set targeting exactly the skills it flagged.
+a real, ready-to-answer set targeting exactly the skills it flagged. Stats
+also has its own pacing view, spanning both practice sets and practice
+tests: questions you answered correctly but slowly, or wrong in a rush,
+measured against your own normal pace for that section and difficulty
+rather than a fixed cutoff.
 
 A third way to reach a question, alongside random-sampled sets and premade
 tests: `/problems` is a Bluebook-style browser over the entire question
@@ -64,6 +71,15 @@ you've run the one-time `pnpm embed` step, every row also gets a "View
 similar problems" link that re-ranks the same browser by content similarity
 to that question — reachable from `/problems` itself, from the post-answer
 feedback in the practice runner, and from a set's results page.
+
+The same embeddings power "Smart select" in the `/new` builder: describe
+what you want in free text ("passages that are poems with figurative
+language", "semicolon joining two independent clauses") and the AI searches
+the bank for matching questions within whatever filters you've already set,
+previewing each pick with a one-line reason — and a link straight to it in
+`/problems` — before you build anything. Like "View similar problems," it
+needs `OPENROUTER_API_KEY` and a populated embedding table, and disappears
+from the UI without either.
 
 ## From-scratch setup
 
