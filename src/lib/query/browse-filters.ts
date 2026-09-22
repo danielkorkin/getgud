@@ -144,7 +144,15 @@ export function parseBrowseParams(sp: BrowseSearchParams): BrowseFilters {
   const sort: BrowseSort = (SORTS as readonly string[]).includes(sortRaw) ? (sortRaw as BrowseSort) : "skill";
 
   const pageRaw = Number(first(sp.page));
-  const page = Number.isInteger(pageRaw) && pageRaw > 0 ? pageRaw : 1;
+  // Focus mode (?question=<id>) always matches exactly one row (see
+  // buildBrowseWhereFragment's focusOn branch in browse-questions.ts) — a
+  // stray page=2+ left over from prior browsing state (a bookmark, a link
+  // built from a filters object that still had an old page number) would
+  // OFFSET past that single row and render "That question could not be
+  // found" for a question that actually exists. Force page 1 whenever
+  // focusId is set, the same way sort is forced away from a value that
+  // wouldn't make sense with the current mode, just above.
+  const page = focusId ? 1 : Number.isInteger(pageRaw) && pageRaw > 0 ? pageRaw : 1;
 
   return {
     assessment,

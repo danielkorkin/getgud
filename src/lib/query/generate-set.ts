@@ -185,10 +185,11 @@ export async function countMatchingQuestions(filters: SetFilters, profileId: str
 }
 
 /**
- * Every question matching `filters` — the pool `sampleQuestions` draws from,
- * unordered and unlimited. Exposed separately (rather than only ever LIMITed)
- * for "Smart select" (src/lib/query/smart-select.ts), which needs the full
- * matching pool to search/re-rank within before it ever samples a count.
+ * Every question matching `filters`, unordered and unlimited — the
+ * candidate pool for "Smart select" (src/lib/query/smart-select.ts), which
+ * needs to search/re-rank within the whole matching pool before it ever
+ * samples a count. Deliberately a SEPARATE query from `sampleQuestions`
+ * below (not shared via `.slice()`) — see that function's comment for why.
  */
 export async function listMatchingQuestions(
   filters: SetFilters,
@@ -235,19 +236,57 @@ export async function listMatchingQuestions(
   return db.runtime().query(plan);
 }
 
-/** Fisher-Yates in place — used to turn the full matching pool into a random sample. */
-function shuffle<T>(items: T[]): T[] {
-  for (let i = items.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [items[i], items[j]] = [items[j], items[i]];
-  }
-  return items;
-}
-
+// Deliberately its own DB-side `ORDER BY random() LIMIT n` query rather than
+// `listMatchingQuestions(...).slice(...)` — this is /new's single most
+// common action (every plain "Build set" click, not just Smart select),
+// and a broad-filter build can match a couple thousand rows for one
+// assessment. Fetching and shuffling the *entire* pool in Node just to keep
+// one code path shared would regress every ordinary build's latency to
+// serve Smart select's much rarer "full pool" need — that tradeoff runs the
+// wrong direction, so this keeps the original efficient query instead.
 export async function sampleQuestions(
   filters: SetFilters,
   profileId: string | null,
 ): Promise<SampledQuestion[]> {
-  const pool = await listMatchingQuestions(filters, profileId);
-  return shuffle(pool).slice(0, filters.questionCount);
+  const w = buildWhereFragment(filters, profileId);
+  const plan = db.raw.sql`
+    SELECT
+      q.id AS "questionId",
+      q.type,
+      q."contentSource",
+      qa."sectionCode",
+      qa."domainCode",
+      qa."skillCode",
+      qa.difficulty,
+      qa."scoreBand"
+    FROM question q
+    JOIN question_assessment qa ON qa."questionId" = q.id
+    WHERE qa.assessment = ${w.assessment}
+      AND qa."sectionCode" = ANY(${w.sections})
+      AND qa.difficulty = ANY(${w.difficulties})
+      AND qa."domainCode" = ANY(${w.domains})
+      AND qa."skillCode" = ANY(${w.skills})
+      AND (qa."scoreBand" IS NULL OR qa."scoreBand" = ANY(${w.scoreBands}))
+      AND q.type = ANY(${w.types})
+      AND cardinality(q."correctAnswer") > 0
+      AND NOT (q.id = ANY(${w.reserved}))
+      AND (
+        NOT ${w.excludeAttempted}
+        OR NOT EXISTS (SELECT 1 FROM attempt a WHERE a."profileId" = ${w.profileId} AND a."questionId" = q.id)
+      )
+    ORDER BY random()
+    LIMIT ${filters.questionCount}
+  `
+    .returnsRow({
+      questionId: "pg/text@1",
+      type: "pg/text@1",
+      contentSource: "pg/text@1",
+      sectionCode: "pg/text@1",
+      domainCode: "pg/text@1",
+      skillCode: "pg/text@1",
+      difficulty: "pg/text@1",
+      scoreBand: "pg/int4@1",
+    })
+    .build();
+  return db.runtime().query(plan);
 }

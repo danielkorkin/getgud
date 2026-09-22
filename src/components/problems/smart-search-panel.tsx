@@ -102,7 +102,12 @@ export function SmartSearchPanel({ filters, activeSet }: SmartSearchPanelProps) 
       assessment: filters.assessment,
       sections: pick.sectionCode,
     });
-    return `/problems?${qs.toString()}`;
+    const href = `/problems?${qs.toString()}`;
+    // Carry the active set along, same as every other "open in library"
+    // link (buildSimilarHref in src/app/problems/page.tsx) — without it,
+    // the new tab this opens in would show no active-set bar at all, even
+    // though the tab it was opened FROM has one.
+    return activeSet ? `${href}&set=${encodeURIComponent(activeSet.id)}` : href;
   }
 
   const selectableCount = picks.filter((p) => p.gradable).length;

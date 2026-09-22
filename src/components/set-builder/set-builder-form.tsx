@@ -51,6 +51,12 @@ export function SetBuilderForm({ smartAvailable = false }: { smartAvailable?: bo
   const [smartPrompt, setSmartPrompt] = useState("");
   const [smartSelected, setSmartSelected] = useState<ReadonlySet<string>>(new Set());
   const [smartSelectedKey, setSmartSelectedKey] = useState<string | null>(null);
+  // How many picks the last search actually found (independent of how many
+  // are currently checked) — needed to tell "no search has run, or it found
+  // nothing" (fine to fall back to a plain random build) apart from "a
+  // search found matches but the student unchecked all of them" (should
+  // block the build, not silently build an unrelated random set instead).
+  const [smartPicksCount, setSmartPicksCount] = useState(0);
 
   const availableDomains = useMemo(
     () => sectionCodes.flatMap((s) => domainsForSection(s)),
@@ -102,6 +108,7 @@ export function SetBuilderForm({ smartAvailable = false }: { smartAvailable?: bo
     () => (smartSelectedKey === poolKey ? smartSelected : new Set<string>()),
     [smartSelectedKey, poolKey, smartSelected],
   );
+  const effectiveSmartPicksCount = smartSelectedKey === poolKey ? smartPicksCount : 0;
 
   // Derived, not eagerly set — the effect below only writes on actual
   // resolution, so there's no synchronous setState at the top of the
@@ -149,7 +156,15 @@ export function SetBuilderForm({ smartAvailable = false }: { smartAvailable?: bo
     [effectiveSmartSelected, questionCount],
   );
 
+  // A search found genuine matches, but the student unchecked every one of
+  // them — NOT the same thing as "no search has run" or "the search found
+  // nothing" (both of which fall back to a plain random build below). This
+  // case must block the build entirely rather than silently substituting an
+  // unrelated random set for the one the student was reviewing.
+  const smartAllDeselected = effectiveSmartPicksCount > 0 && cappedSmartSelected.size === 0;
+
   function handleSubmit() {
+    if (smartAllDeselected) return; // belt-and-suspenders — the button is already disabled for this
     setError(null);
     startTransition(async () => {
       const result =
@@ -267,9 +282,10 @@ export function SetBuilderForm({ smartAvailable = false }: { smartAvailable?: bo
           poolKey={poolKey}
           prompt={smartPrompt}
           onPromptChange={setSmartPrompt}
-          onSelectionChange={(_picks, selected) => {
+          onSelectionChange={(picks, selected) => {
             setSmartSelected(selected);
             setSmartSelectedKey(poolKey);
+            setSmartPicksCount(picks.length);
           }}
         />
       )}
@@ -364,10 +380,18 @@ export function SetBuilderForm({ smartAvailable = false }: { smartAvailable?: bo
       <Card>
         <CardHeader>
           <CardTitle className="font-mono text-2xl">
-            {cappedSmartSelected.size > 0 ? cappedSmartSelected.size : countLoading ? "…" : (count ?? 0)}
+            {cappedSmartSelected.size > 0 || smartAllDeselected
+              ? cappedSmartSelected.size
+              : countLoading
+                ? "…"
+                : (count ?? 0)}
           </CardTitle>
           <CardDescription>
-            {cappedSmartSelected.size > 0 ? (
+            {smartAllDeselected ? (
+              <span className="text-destructive">
+                Check at least one smart match above, or clear the search to build a random set instead.
+              </span>
+            ) : cappedSmartSelected.size > 0 ? (
               "smart-selected question" + (cappedSmartSelected.size === 1 ? "" : "s") + " kept"
             ) : (
               <>
@@ -383,7 +407,9 @@ export function SetBuilderForm({ smartAvailable = false }: { smartAvailable?: bo
           {error && <p className="text-sm text-destructive">{error}</p>}
           <Button
             onClick={handleSubmit}
-            disabled={pending || (cappedSmartSelected.size === 0 && (countLoading || (count ?? 0) === 0))}
+            disabled={
+              pending || smartAllDeselected || (cappedSmartSelected.size === 0 && (countLoading || (count ?? 0) === 0))
+            }
           >
             {pending
               ? "Building…"

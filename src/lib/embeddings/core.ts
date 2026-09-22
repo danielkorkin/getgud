@@ -153,10 +153,6 @@ export class EmbeddingIndex {
     return this.ids.length;
   }
 
-  get dimension(): number {
-    return this.dim;
-  }
-
   has(id: string): boolean {
     return this.rowOf.has(id);
   }

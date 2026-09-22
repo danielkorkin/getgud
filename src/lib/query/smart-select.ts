@@ -90,9 +90,7 @@ export interface SmartCandidate {
   preview: string;
 }
 
-export type SmartSelectOutcome =
-  | { picks: SmartCandidate[]; note: string; poolSize: number }
-  | { error: string };
+export type SmartSelectOutcome = { picks: SmartCandidate[]; note: string } | { error: string };
 
 const PREVIEW_MAX_CHARS = 180;
 
@@ -119,10 +117,20 @@ export async function smartSelectFromPool(
     // about the same as retrieving a subset of it — skip the embed call.
     poolForRerank = pool;
   } else {
-    const { embedding } = await embed({ model: getEmbeddingModel(), value: userPrompt });
-    const queryVector = l2Normalize(Float32Array.from(embedding));
-    const poolIds = new Set(pool.map((q) => q.questionId));
-    const hits = await rankByVector(queryVector, poolIds, candidateCap);
+    let hits;
+    try {
+      const { embedding } = await embed({ model: getEmbeddingModel(), value: userPrompt });
+      const queryVector = l2Normalize(Float32Array.from(embedding));
+      const poolIds = new Set(pool.map((q) => q.questionId));
+      hits = await rankByVector(queryVector, poolIds, candidateCap);
+    } catch (e) {
+      // Same graceful-failure contract as the generateObject call below —
+      // an OpenRouter hiccup on the embedding request (or, in principle, a
+      // dimension mismatch from topKForVector if the embedding model ever
+      // changes) shouldn't surface as an unhandled exception out of a
+      // Server Action.
+      return { error: e instanceof Error ? e.message : "Smart select failed while searching — try again." };
+    }
     if (hits.length === 0) {
       // No embeddings for this pool at all (shouldn't happen once callers
       // gate this feature behind similarSearchAvailable(), but fail safe
@@ -202,7 +210,7 @@ export async function smartSelectFromPool(
     if (picks.length >= requestedCount) break;
   }
 
-  return { picks, note: result.note, poolSize: pool.length };
+  return { picks, note: result.note };
 }
 
 /** /new's caller: pool from generate-set.ts, which is already gradable-only. */

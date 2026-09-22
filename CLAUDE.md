@@ -799,7 +799,17 @@ result to that one row — the point of a direct link is that it always shows,
 regardless of whatever domain/difficulty/search/attempted state happens to
 be active on `/problems` already. `ProblemsBrowser` takes a `defaultOpenId`
 prop (`Accordion`'s uncontrolled `defaultValue`) so that one row starts
-expanded rather than requiring an extra click.
+expanded rather than requiring an extra click. `parseBrowseParams` also
+forces `page` to 1 whenever `focusId` is set — since focus mode always
+matches exactly one row, a stray `page=2+` left in the URL (a bookmark, or
+a href built from a filters object that still had an old page number) would
+otherwise `OFFSET` straight past that single row and render "That question
+could not be found" for a question that actually exists. `/problems`' own
+Smart search panel's "open in the library" link also carries `&set=<id>`
+whenever there's an active hand-picked set, exactly like `similarHref` does
+— dropping it would open a fresh tab with no active-set bar even though the
+tab it was opened from has one. (`/new`'s panel has no active-set concept
+to carry — that's a `/problems`-only affordance.)
 
 **`/problems`' panel is a self-contained client component, not threaded into
 the page's URL/pagination model the way `similarTo`/`focusId` are.** A smart
@@ -866,6 +876,19 @@ the actual *set* of selected values. `filtersKey` (the sibling key driving
 the live "N questions match" count) is left unsorted on purpose — that
 effect just re-fetches on any key change, so the same reordering only costs
 a redundant request there, never a correctness problem.
+
+**Unchecking every Smart select pick blocks the build — it does NOT fall
+back to a plain random build.** `set-builder-form.tsx` tracks
+`smartPicksCount` (how many the last search actually found, independent of
+how many are currently checked) alongside the selection itself. "Zero
+selected" is ambiguous by itself: it means "no search has run, or it found
+nothing" (the existing, deliberate fallback to a plain `createSet` build —
+verified UX, keep it) in one case, and "a search found real matches but the
+student unchecked all of them" in the other, which must never silently
+substitute an unrelated random set for the one the student was reviewing.
+`smartAllDeselected = effectiveSmartPicksCount > 0 && cappedSmartSelected.size === 0`
+distinguishes the two and disables the Build button (with an explicit
+"check at least one, or clear the search" message) only for the second.
 
 ## Learn section (resources + guides)
 
