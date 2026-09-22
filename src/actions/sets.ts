@@ -16,7 +16,9 @@ import {
 } from "@/lib/query/generate-set";
 import { hintsConfigured } from "@/lib/ai/hint-provider";
 import { similarSearchAvailable } from "@/lib/query/similar-questions";
-import { smartSelectQuestions, type SmartCandidate } from "@/lib/query/smart-select";
+import { smartSelectFromPool, smartSelectQuestions, type SmartCandidate, type SmartPoolQuestion } from "@/lib/query/smart-select";
+import { listMatchingBrowseQuestions } from "@/lib/query/browse-questions";
+import type { BrowseFilters } from "@/lib/query/browse-filters";
 
 export async function countMatching(raw: RawSetFilters): Promise<{ count: number } | { error: string }> {
   const validated = validateSetFilters(raw);
@@ -425,4 +427,56 @@ export async function removeQuestionFromSet(setId: string, questionId: string): 
   revalidatePath("/problems");
   revalidatePath("/sets");
   return { ok: true };
+}
+
+// ─── Smart search (the /problems library's own copy of Smart select) ──────
+// Same free-text-description-plus-embeddings-plus-LLM-re-rank engine as
+// /new's `smartSelect` above (src/lib/query/smart-select.ts's shared
+// `smartSelectFromPool`), searching within whatever facet/text/attempted
+// filters are already active on /problems instead of a set-builder's
+// SetFilters. Deliberately reuses /problems' own lenient pool
+// (`listMatchingBrowseQuestions` — reserved-exam and ungradable questions
+// included, not excluded like /new's pool) rather than generate-set.ts's,
+// so a pick here can be ungradable — `smart-search-panel.tsx` flags that
+// and disables adding it to a set, the same rule `addQuestionsToSet`
+// already enforces (a batch containing one ungradable id is rejected
+// wholesale).
+
+// No length slider on /problems (this is a search, not a set-length
+// choice) — a fixed cap close to BROWSE_PAGE_SIZE keeps the re-rank prompt
+// and the results list roughly one "page" of matches.
+const PROBLEMS_SMART_SEARCH_COUNT = 20;
+
+export async function smartSearchProblems(
+  filters: BrowseFilters,
+  prompt: string,
+): Promise<{ picks: SmartCandidate[]; note: string } | { error: string }> {
+  const trimmedPrompt = prompt.trim();
+  if (trimmedPrompt.length === 0) return { error: "Describe what you're looking for first." };
+  if (trimmedPrompt.length > MAX_PROMPT_CHARS) {
+    return { error: `Keep the description under ${MAX_PROMPT_CHARS} characters.` };
+  }
+
+  if (!hintsConfigured()) {
+    return { error: "Smart search isn't configured — set OPENROUTER_API_KEY to enable it." };
+  }
+  if (!(await similarSearchAvailable())) {
+    return { error: "Smart search needs question embeddings — run `pnpm embed` first." };
+  }
+
+  const profileId = await requireProfileId();
+  const pool = await listMatchingBrowseQuestions(filters, profileId);
+  const poolQuestions: SmartPoolQuestion[] = pool.map((q) => ({
+    questionId: q.questionId,
+    sectionCode: q.sectionCode,
+    domainCode: q.domainCode,
+    skillCode: q.skillCode,
+    difficulty: q.difficulty,
+    type: q.type,
+    gradable: q.gradable,
+  }));
+
+  const result = await smartSelectFromPool(poolQuestions, trimmedPrompt, PROBLEMS_SMART_SEARCH_COUNT);
+  if ("error" in result) return result;
+  return { picks: result.picks, note: result.note };
 }

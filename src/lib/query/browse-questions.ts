@@ -239,6 +239,73 @@ async function fetchBrowseFacetRows(
   return db.runtime().query(plan);
 }
 
+export interface BrowseCandidate {
+  questionId: string;
+  sectionCode: string;
+  domainCode: string;
+  skillCode: string;
+  difficulty: string;
+  type: string;
+  /** Same definition as BrowseRow.gradable — cardinality(correctAnswer) > 0. */
+  gradable: boolean;
+}
+
+/**
+ * Every question matching `filters` — the candidate pool for "Smart search"
+ * (src/actions/sets.ts's `smartSearchProblems`, src/lib/query/smart-select.ts),
+ * unordered and unlimited, exactly like generate-set.ts's
+ * `listMatchingQuestions` is to /new's Smart select. Deliberately a
+ * DIFFERENT function rather than a shared one: this applies `/problems`'
+ * own lenient policy (no reserved-exam exclusion, ungradable questions
+ * included — flagged via `gradable` rather than filtered out) — see the
+ * "Deliberately NOT inherited" comment on `buildBrowseWhereFragment` above.
+ * `similarTo`/`focusId`/`sort`/`page` are ignored entirely; only the plain
+ * facet + search + attempted filters bound the pool.
+ */
+export async function listMatchingBrowseQuestions(
+  filters: BrowseFilters,
+  profileId: string,
+): Promise<BrowseCandidate[]> {
+  const w = buildBrowseWhereFragment(filters, profileId, null);
+  const plan = db.raw.sql`
+    SELECT
+      q.id AS "questionId",
+      qa."sectionCode",
+      qa."domainCode",
+      qa."skillCode",
+      qa.difficulty,
+      q.type,
+      cardinality(q."correctAnswer") > 0 AS gradable
+    FROM question q
+    JOIN question_assessment qa ON qa."questionId" = q.id
+    WHERE qa.assessment = ${w.assessment}::text
+      AND qa."sectionCode" = ANY(${w.sections})
+      AND qa.difficulty = ANY(${w.difficulties})
+      AND qa."domainCode" = ANY(${w.domains})
+      AND qa."skillCode" = ANY(${w.skills})
+      AND (qa."scoreBand" IS NULL OR qa."scoreBand" = ANY(${w.scoreBands}))
+      AND q.type = ANY(${w.types})
+      AND (${w.search}::text = '' OR q.stem ILIKE ${w.pattern}::text OR q.stimulus ILIKE ${w.pattern}::text)
+      AND (
+        ${w.attempted}::text = 'any'
+        OR (${w.attempted}::text = 'unattempted' AND NOT EXISTS (SELECT 1 FROM attempt a WHERE a."profileId" = ${w.profileId}::text AND a."questionId" = q.id AND a.status = 'answered'))
+        OR (${w.attempted}::text = 'attempted' AND EXISTS (SELECT 1 FROM attempt a WHERE a."profileId" = ${w.profileId}::text AND a."questionId" = q.id AND a.status = 'answered'))
+        OR (${w.attempted}::text = 'incorrect' AND EXISTS (SELECT 1 FROM attempt a WHERE a."profileId" = ${w.profileId}::text AND a."questionId" = q.id AND a."isCorrect" = false))
+      )
+  `
+    .returnsRow({
+      questionId: "pg/text@1",
+      sectionCode: "pg/text@1",
+      domainCode: "pg/text@1",
+      skillCode: "pg/text@1",
+      difficulty: "pg/text@1",
+      type: "pg/text@1",
+      gradable: "pg/bool@1",
+    })
+    .build();
+  return db.runtime().query(plan);
+}
+
 export async function browseQuestions(
   filters: BrowseFilters,
   profileId: string,

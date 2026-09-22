@@ -173,7 +173,7 @@ export function SmartSelectPanel({ filters, poolKey, prompt, onPromptChange, onS
                     className="group/open flex items-center gap-1 truncate text-sm hover:text-foreground hover:underline"
                     title="Open in the question bank"
                   >
-                    <span className="truncate">{p.preview}</span>
+                    <span className="min-w-0 truncate">{p.preview}</span>
                     <ArrowSquareOutIcon className="size-3.5 shrink-0 text-muted-foreground group-hover/open:text-foreground" />
                   </Link>
                   <p className="text-xs text-muted-foreground italic">{p.reason}</p>

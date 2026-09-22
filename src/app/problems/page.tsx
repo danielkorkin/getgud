@@ -7,12 +7,14 @@ import { BROWSE_PAGE_SIZE, browseParamsToQuery, parseBrowseParams } from "@/lib/
 import { browseQuestions, countBrowseQuestions, type BrowseRow, type SimilarContext } from "@/lib/query/browse-questions";
 import { SIMILAR_POOL_SIZE, rankSimilar, similarSearchAvailable } from "@/lib/query/similar-questions";
 import { renderContentField } from "@/lib/content/render";
+import { hintsConfigured } from "@/lib/ai/hint-provider";
 import type { AnswerOption } from "@/lib/grading";
 import { SiteNav } from "@/components/site-nav";
 import { ProblemFilters } from "@/components/problems/problem-filters";
 import { ProblemsBrowser } from "@/components/problems/problems-browser";
 import { ResultsToolbar } from "@/components/problems/results-toolbar";
 import { PaginationBar } from "@/components/problems/pagination-bar";
+import { SmartSearchPanel } from "@/components/problems/smart-search-panel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { XIcon } from "@phosphor-icons/react/dist/ssr";
@@ -189,6 +191,17 @@ export default async function ProblemsPage({ searchParams }: PageProps<"/problem
     filters = { ...filters, assessment: activeSet.assessment };
   }
 
+  // Computed once and reused below — similarSearchAvailable() is cheap
+  // after the first call (its index is cached on globalThis), but there's
+  // no reason to call it twice in one render.
+  const embeddingsAvailable = await similarSearchAvailable();
+
+  // Same gating precedent as /new's Smart select and "View similar
+  // problems" — hidden entirely rather than shown-and-erroring when
+  // OPENROUTER_API_KEY isn't set or `pnpm embed` hasn't populated the
+  // embedding table yet.
+  const smartAvailable = hintsConfigured() && embeddingsAvailable;
+
   // Resolve similar-mode up front: the source question + its ranked
   // neighbours. Three distinct "nothing to show" states get their own copy
   // in the banner below, rather than one generic empty result —
@@ -199,7 +212,7 @@ export default async function ProblemsPage({ searchParams }: PageProps<"/problem
   let similarContext: SimilarContext | null = null;
   let similarUnavailable = false;
   if (filters.similarTo) {
-    if (!(await similarSearchAvailable())) {
+    if (!embeddingsAvailable) {
       similarUnavailable = true;
     } else {
       const [source, hits] = await Promise.all([
@@ -301,7 +314,18 @@ export default async function ProblemsPage({ searchParams }: PageProps<"/problem
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[280px_1fr]">
           <ProblemFilters filters={filters} pinnedAssessment={activeSet?.assessment ?? null} />
 
-          <div className="flex flex-col gap-4">
+          {/*
+            min-w-0: a CSS Grid item's default min-width is "auto" — the
+            same overflow trap flexbox has, just one layer up. Without it,
+            Smart search's long, single-line (truncate = white-space:nowrap)
+            preview text pushes this whole 1fr track wider than the grid
+            actually allocated it, which then pushes the whole page into
+            horizontal scroll. Confirmed via computed styles: the grid
+            container was correctly 976px wide, but this child measured
+            1291px until this was added.
+          */}
+          <div className="flex min-w-0 flex-col gap-4">
+            {smartAvailable && <SmartSearchPanel filters={filters} activeSet={activeSet} />}
             <ResultsToolbar filters={filters} resultCount={total} />
             <ProblemsBrowser
               rows={renderedRows}

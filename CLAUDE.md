@@ -714,33 +714,58 @@ above.
 
 ## Smart select (AI question search)
 
-A free-text prompt in the `/new` set builder ("passages that are poems with
-figurative language," "semicolon joining two independent clauses") that
-searches for questions matching it *within* whatever facets are already
-chosen, using this app's embeddings (same table "View similar problems"
-reads) plus one LLM re-rank call — `src/lib/query/smart-select.ts`'s
-`smartSelectQuestions`, called from `src/actions/sets.ts`'s `smartSelect`
-(search) and `createSmartSet` (build). The builder previews picks with a
-one-line reason each before anything is written — never builds straight
-from the AI's output.
+A free-text prompt ("passages that are poems with figurative language,"
+"semicolon joining two independent clauses") that searches for questions
+matching it *within* whatever facets are already chosen, using this app's
+embeddings (same table "View similar problems" reads) plus one LLM re-rank
+call. **Two independent surfaces share one core**, `src/lib/query/smart-select.ts`'s
+`smartSelectFromPool(pool, prompt, requestedCount)`:
+- The `/new` set builder — `src/actions/sets.ts`'s `smartSelect` (search)
+  and `createSmartSet` (build), via `smartSelectQuestions(filters, ...)`'s
+  thin wrapper around the shared core. Previews picks with a one-line
+  reason each before anything is written — never builds straight from the
+  AI's output.
+- The `/problems` library (`src/components/problems/smart-search-panel.tsx`) —
+  `src/actions/sets.ts`'s `smartSearchProblems`, feeding the same core a
+  *different* pool (see below). Results can be opened (new tab, via the
+  `?question=<id>` deep link below) or bulk-added to whatever set is
+  currently active in the sticky bar, exactly like the rest of `/problems`.
 
-**Pipeline**: `listMatchingQuestions` (a new export on `generate-set.ts` —
-the same WHERE clause `sampleQuestions` uses, with `ORDER BY random() LIMIT`
-removed, so it returns the *whole* matching pool) → if the pool already fits
-within `rerankCandidateCount(questionCount)` (`similar-questions.ts`, scales
-48–120 with the requested length), skip retrieval and re-rank the whole pool
-directly; otherwise embed the user's prompt and call the new
-`rankByVector`/`EmbeddingIndex.topKForVector` (an `allow`-set-restricted
-sibling of the existing `topK`, sharing a private `scan` method with it) to
-narrow the pool to that candidate count → hydrate candidate content →
-one `generateObject` call (`smart-select-prompt.ts` + `smart-select-schema.ts`)
-picks among the candidates by 1-based index, dropping any hallucinated or
-out-of-range index. **This inherits `/new`'s reserved/ungradable policy, not
-`/problems`'** — `listMatchingQuestions` shares `generate-set.ts`'s
-`buildWhereFragment`, so `RESERVED_QUESTION_IDS` and the
-`cardinality(correctAnswer) > 0` gate apply here exactly as they do to plain
-random sampling (the opposite of "Similar problems"' policy, which
-deliberately inherits `/problems`' more permissive one — see above).
+**Pipeline** (inside `smartSelectFromPool`): given an already-filtered pool
+(no LIMIT) → if it already fits within `rerankCandidateCount(requestedCount)`
+(`similar-questions.ts`, scales 48–120 with the requested count), skip
+retrieval and re-rank the whole pool directly; otherwise embed the user's
+prompt and call `rankByVector`/`EmbeddingIndex.topKForVector` (an
+`allow`-set-restricted sibling of the existing `topK`, sharing a private
+`scan` method with it) to narrow the pool to that candidate count → hydrate
+candidate content → one `generateObject` call (`smart-select-prompt.ts` +
+`smart-select-schema.ts`) picks among the candidates by 1-based index,
+dropping any hallucinated or out-of-range index.
+
+**The two callers deliberately build their pool differently, and this is
+the one thing that must never be collapsed into a shared pool-fetcher:**
+- `/new`'s pool (`generate-set.ts`'s `listMatchingQuestions`) applies `/new`'s
+  own stricter policy — `RESERVED_QUESTION_IDS` excluded,
+  `cardinality(correctAnswer) > 0` required — the same policy plain random
+  sampling uses. Every pool row is implicitly gradable, so
+  `smartSelectQuestions` maps it to the shared core's pool shape with
+  `gradable: true` on every item.
+- `/problems`' pool (`browse-questions.ts`'s `listMatchingBrowseQuestions`)
+  applies `/problems`' own lenient policy instead — reserved-exam questions
+  included, ungradable questions included too (this is the same fork
+  documented under "Problems database" above: `browse-questions.ts` keeps
+  its own copy of the WHERE clause specifically so a future edit to one
+  policy can't silently change the other). Because ungradable questions can
+  now show up as picks, the shared pool type
+  (`SmartPoolQuestion`/`SmartCandidate`) carries an explicit `gradable`
+  field rather than assuming every candidate is gradable the way `/new`'s
+  pool always is — `smart-search-panel.tsx` flags an ungradable pick ("No
+  answer on file") and disables its checkbox, the same rule
+  `addQuestionsToSet` already enforces (it rejects a whole batch containing
+  one ungradable id).
+- `smartSearchProblems` has no length slider to key off (this is a search,
+  not a set-length choice) — it passes a fixed `PROBLEMS_SMART_SEARCH_COUNT`
+  (20, matching `BROWSE_PAGE_SIZE`'s mental model) as `requestedCount`.
 
 **Not HyDE.** An earlier version embedded an LLM-written synthetic exemplar
 passage instead of the user's own prompt text — measured in
@@ -760,9 +785,11 @@ picks are shown to the student *before* they practice the set, so leaking an
 answer here would spoil the question the same way it would in `/api/coach`
 before an attempt is answered.
 
-**Every card's title also links straight to that question in `/problems`**,
-opening in a new tab (`/new` carries too much in-progress state — filters,
-prompt, other picks — to navigate away from it). This reuses
+**Every card's title, on both surfaces, also links straight to that question
+in `/problems`** — always in a new tab, even from the `/problems` panel
+itself (its own results are a search overlay, not the underlying paginated
+listing, so "open" still means a fresh, expanded view of just that one
+question rather than scrolling to find it below). This reuses
 `browse-filters.ts`'s `focusId` (`?question=<id>`, alongside the assessment/
 section pinning `similarHref` already does), a sibling of `similarTo` added
 for exactly this: unlike `similarTo`, which narrows a ranked pool *within*
@@ -773,6 +800,38 @@ regardless of whatever domain/difficulty/search/attempted state happens to
 be active on `/problems` already. `ProblemsBrowser` takes a `defaultOpenId`
 prop (`Accordion`'s uncontrolled `defaultValue`) so that one row starts
 expanded rather than requiring an extra click.
+
+**`/problems`' panel is a self-contained client component, not threaded into
+the page's URL/pagination model the way `similarTo`/`focusId` are.** A smart
+search is a slow (embed + LLM), non-deterministic, on-demand action — unlike
+the cheap, instant, URL-driven facet/text/similarity filters, re-running it
+on every navigation or page change would be both wasteful and would make
+pagination unstable (the same prompt can legitimately return a different
+picks list on a second run). So its results live only in
+`smart-search-panel.tsx`'s own state until the next search, exactly like
+`/new`'s panel — they're never encoded into the URL, and normal
+browsing/pagination below it is completely unaffected. Adding to the active
+set goes through the same `addQuestionsToSet` + `router.refresh()` path
+`ProblemsBrowser` already uses, so the sticky bar's count updates without
+the panel needing to share React state with it.
+
+**A CSS Grid gotcha this surfaced, worth knowing before adding another
+long-single-line truncated string near a grid layout.** A grid item's
+default `min-width` is `auto` — the same automatic-minimum-size trap
+flexbox has, just one layer up the tree. `smart-search-panel.tsx`'s preview
+text uses `truncate` (`white-space: nowrap`), so its intrinsic min-content
+width is its full untruncated length; without an explicit `min-w-0` on
+every flex/grid ancestor between it and the constraining container, that
+width propagates all the way up and pushes the container wider than
+intended instead of actually truncating. Two fixes were needed here, at two
+different levels: `min-w-0` on the truncated `<span>` itself (a flexbox fix,
+also applied to `/new`'s panel), and `min-w-0` on `/problems/page.tsx`'s
+`1fr` grid-column child (a *grid* fix — confirmed via computed styles: the
+grid container was correctly 976px wide, but its direct child measured
+1291px until this was added). `/new`'s layout never hit the second one
+because its page has no grid — a single flex column all the way up, capped
+by a hard `max-w-2xl` rather than a `1fr` track sharing space with a
+sibling.
 
 **`createSmartSet` re-derives the pool server-side and intersects it with
 the client's id list rather than trusting the ids directly** — same
