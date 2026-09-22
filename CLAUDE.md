@@ -1062,6 +1062,33 @@ serving mismatched build output before assuming it's a code regression
 running after a rebuild served a page that referenced the new chunk hashes
 against the old server's in-memory module graph).
 
+**shadcn's stock `chart.tsx` axis-tick color selector doesn't match this
+project's recharts 3.8.0** — the boilerplate targets
+`.recharts-cartesian-axis-tick text` (a `<text>` nested inside a `<g
+class="recharts-cartesian-axis-tick">`), which was true for recharts v2 but
+no longer matches: v3.8 renders the tick *line* and tick *label* as sibling
+layers (`CartesianAxis.js`'s `Ticks`), so the label's actual ancestor class
+is `recharts-cartesian-axis-tick-label`, a different token, and the old
+selector silently never applies. With no CSS override, every axis tick
+keeps recharts' own hardcoded `fill="#666"` (an SVG presentation attribute,
+not `theme`-aware) — barely readable against this app's dark-mode card
+background. The fix, already applied in `chart.tsx`, is to target the
+`<text>` element's own class instead: `.recharts-cartesian-axis-tick-value`
+(present on the element directly, no ancestor-token match needed). Verify
+any future recharts bump hasn't renamed this again by checking a tick's
+`getComputedStyle(...).fill` in devtools — it should resolve to the
+`--muted-foreground` OKLCH value, never `rgb(102, 102, 102)`.
+
+**A `ReferenceLine` label positioned `insideTopRight` sits at the very top
+of the plot area, which — because `RateBarChart`/`DifficultyBarChart` use
+`layout="vertical"` (horizontal bars) — is the same height as the topmost
+category's bar.** The "Your average" label rendered directly on top of
+(and largely illegible over) whichever bar happened to be first, and with
+the charts' default ~5px top margin it also sat close enough to the SVG's
+own edge to look clipped. Both charts now pass `margin={{ top: 20, ... }}`
+and `position: "top"` instead, which renders the label in that added
+headroom, clear of every bar. Keep this pairing (extra top margin + `"top"`
+position) for any new bar chart that adds a reference line here.
 **A bar chart's width *is* its value, so an exact 0% bar is invisible by
 construction** — every `<Bar>` also sets `minPointSize={2}` so a
 0%-accuracy category still shows a visible sliver instead of looking

@@ -27,7 +27,7 @@ export function DifficultyBarChart({ data, referenceValue }: { data: DifficultyR
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="aspect-auto h-[140px] w-full">
-          <BarChart data={chartData} layout="vertical" margin={{ left: 8, right: 16 }}>
+          <BarChart data={chartData} layout="vertical" margin={{ top: 20, left: 8, right: 16 }}>
             <CartesianGrid horizontal={false} />
             <XAxis type="number" domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} tickLine={false} axisLine={false} />
             <YAxis type="category" dataKey="label" width={72} tickLine={false} axisLine={false} />
@@ -42,7 +42,7 @@ export function DifficultyBarChart({ data, referenceValue }: { data: DifficultyR
                 x={Math.round(referenceValue * 100)}
                 stroke="var(--muted-foreground)"
                 strokeDasharray="4 4"
-                label={{ value: "Your average", position: "insideTopRight", fill: "var(--muted-foreground)", fontSize: 11 }}
+                label={{ value: "Your average", position: "top", fill: "var(--muted-foreground)", fontSize: 11 }}
               />
             )}
           </BarChart>

@@ -47,7 +47,8 @@ A third header section, **Stats** (`/stats`), rolls every practice set and
 practice test into one dashboard: accuracy trends, skill/domain/difficulty
 breakdowns, time-of-day and tool-usage (calculator, reference sheet,
 marked-for-review) patterns, and exam score history, each paired with
-plain-English insights so the charts come with a takeaway, not just numbers.
+plain-English insights so the charts come with a takeaway, not just numbers —
+legible in both light and dark mode, and sized to fit on a phone screen.
 An "Analyze my performance" button sends a summary of all of that — plus a
 read of your past post-answer coach conversations, looking for a
 misunderstanding that keeps recurring, and a sample of your actual recent

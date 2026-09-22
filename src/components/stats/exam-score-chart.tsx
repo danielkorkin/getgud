@@ -17,7 +17,7 @@ export function ExamScoreChart({ data }: { data: ExamScorePoint[] }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatCard label="Latest total (out of 1600)" value={String(latest.totalScaled)} />
         <StatCard label="Latest R&W" value={latest.rwScaled != null ? String(latest.rwScaled) : "—"} />
         <StatCard label="Latest Math" value={latest.mathScaled != null ? String(latest.mathScaled) : "—"} />
