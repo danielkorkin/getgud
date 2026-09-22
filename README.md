@@ -77,9 +77,12 @@ what you want in free text ("passages that are poems with figurative
 language", "semicolon joining two independent clauses") and the AI searches
 the bank for matching questions within whatever filters you've already set,
 previewing each pick with a one-line reason — and a link straight to it in
-`/problems` — before you build anything. Like "View similar problems," it
-needs `OPENROUTER_API_KEY` and a populated embedding table, and disappears
-from the UI without either.
+`/problems` — before you build anything. The same free-text search is also
+built into `/problems` itself, narrowing within whatever facet/text/attempted
+filters are already active there; each result opens in `/problems` or can be
+bulk-added straight to whatever set is active in the sticky bar. Like "View
+similar problems," both need `OPENROUTER_API_KEY` and a populated embedding
+table, and disappear from the UI without either.
 
 ## From-scratch setup
 

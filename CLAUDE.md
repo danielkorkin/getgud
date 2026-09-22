@@ -48,12 +48,15 @@ and, in the `/new` builder itself, "Smart select" — a free-text prompt
 ("passages that are poems with figurative language") that searches the bank
 for matching questions within whatever facets are already chosen, using
 those same embeddings plus one LLM re-rank call, previewed with a reason
-per pick before anything is built. See "Practice-tool app layer" below for
-the data model and load-bearing gotchas, "Premade exams" for the exam
-system specifically, "Problems database" for the browser, "Similar
-problems (embeddings)" for that feature, "Smart select (AI question
-search)" for the builder prompt, and "Statistics & AI analysis" for
-`/stats`.
+per pick before anything is built; the same search is also built directly
+into `/problems` as "Smart search," narrowing within whatever filters are
+already active there, with each result opening in `/problems` or
+bulk-adding straight into the active hand-picked set. See "Practice-tool
+app layer" below for the data model and load-bearing gotchas, "Premade
+exams" for the exam system specifically, "Problems database" for the
+browser, "Similar problems (embeddings)" for that feature, "Smart select
+(AI question search)" for both search surfaces, and "Statistics & AI
+analysis" for `/stats`.
 
 ## Commands
 
