@@ -2,7 +2,7 @@ import "server-only";
 
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 
-export const DEFAULT_MODEL = "openai/gpt-5.6-luna";
+export const DEFAULT_MODEL = "openai/gpt-6-luna";
 
 export function hintsConfigured(): boolean {
   return Boolean(process.env.OPENROUTER_API_KEY);

@@ -17,8 +17,9 @@ avatar coach whose eyes track your cursor continuously, who reacts to each
 submission, gives a one-line AI takeaway, and holds a progressive 3-level
 hint ladder (then a confirm-gated answer reveal) and a full post-answer chat
 that's saved per question and restored exactly as you left it — plus a set
-library (`/sets`) and a results screen, and local cookie-based profiles (no
-password). Alongside that, `/tests` offers full-length, timed, adaptive SAT
+library (`/sets`), where any practice set can be renamed or deleted right
+from its card (also from the home page), a results screen, and local
+cookie-based profiles (no password). Alongside that, `/tests` offers full-length, timed, adaptive SAT
 practice tests — the same committed set of questions on every self-hosted
 copy of Getgud, with module-scoped timers, routing into an easier or harder
 second module based on first-module performance, and a scaled score out of

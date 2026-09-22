@@ -17,6 +17,7 @@ import { FEATURED_GUIDES, GUIDES, RESOURCES } from "@/resources";
 import { CreateProfileForm } from "@/components/practice/create-profile-form";
 import { GuideCard } from "@/components/learn/guide-card";
 import { SiteNav } from "@/components/site-nav";
+import { SetCardMenu } from "@/components/sets/set-card-menu";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -119,19 +120,22 @@ export default async function HomePage() {
 
             {inProgress && (
               <Reveal index={inProgressExamSet ? 1 : 0}>
-                <Link href={`/sets/${inProgress.id}`} className="block">
-                  <Card interactive>
-                    <CardHeader>
-                      <CardTitle>Continue: {inProgress.name}</CardTitle>
-                      <CardDescription>
-                        Question {inProgress.currentIndex + 1} of {inProgress.questionCount}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex flex-col gap-3">
-                      <Progress value={(inProgress.currentIndex / Math.max(inProgress.questionCount, 1)) * 100} />
-                    </CardContent>
-                  </Card>
-                </Link>
+                <Card interactive>
+                  <CardHeader>
+                    <div className="flex items-start justify-between gap-2">
+                      <Link href={`/sets/${inProgress.id}`} className="flex min-w-0 flex-1 flex-col gap-1">
+                        <CardTitle>Continue: {inProgress.name}</CardTitle>
+                        <CardDescription>
+                          Question {inProgress.currentIndex + 1} of {inProgress.questionCount}
+                        </CardDescription>
+                      </Link>
+                      <SetCardMenu setId={inProgress.id} name={inProgress.name} />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="flex flex-col gap-3">
+                    <Progress value={(inProgress.currentIndex / Math.max(inProgress.questionCount, 1)) * 100} />
+                  </CardContent>
+                </Card>
               </Reveal>
             )}
           </section>
@@ -280,24 +284,27 @@ export default async function HomePage() {
                 {recent.map((set) => {
                   const pct = set.gradedCount > 0 ? Math.round((set.correctCount / set.gradedCount) * 100) : null;
                   return (
-                    <Link key={set.id} href={`/sets/${set.id}/results`} className="block">
-                      <Card interactive>
-                        <CardHeader>
-                          <CardTitle className="text-base">{set.name}</CardTitle>
-                          <CardDescription>
-                            {set.questionCount} questions
-                            {pct !== null && ` · ${pct}% correct`}
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent className="flex flex-wrap gap-1.5">
-                          {set.difficulties.map((d) => (
-                            <Badge key={d} variant={DIFFICULTY_VARIANT[d as "E" | "M" | "H"] ?? "secondary"}>
-                              {d}
-                            </Badge>
-                          ))}
-                        </CardContent>
-                      </Card>
-                    </Link>
+                    <Card key={set.id} interactive>
+                      <CardHeader>
+                        <div className="flex items-start justify-between gap-2">
+                          <Link href={`/sets/${set.id}/results`} className="flex min-w-0 flex-1 flex-col gap-1">
+                            <CardTitle className="text-base">{set.name}</CardTitle>
+                            <CardDescription>
+                              {set.questionCount} questions
+                              {pct !== null && ` · ${pct}% correct`}
+                            </CardDescription>
+                          </Link>
+                          <SetCardMenu setId={set.id} name={set.name} />
+                        </div>
+                      </CardHeader>
+                      <CardContent className="flex flex-wrap gap-1.5">
+                        {set.difficulties.map((d) => (
+                          <Badge key={d} variant={DIFFICULTY_VARIANT[d as "E" | "M" | "H"] ?? "secondary"}>
+                            {d}
+                          </Badge>
+                        ))}
+                      </CardContent>
+                    </Card>
                   );
                 })}
               </div>

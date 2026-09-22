@@ -214,6 +214,46 @@ export async function abandonSet(setId: string): Promise<void> {
   redirect("/sets");
 }
 
+const MAX_SET_NAME_CHARS = 80;
+
+export async function renameSet(setId: string, name: string): Promise<{ error: string } | { ok: true }> {
+  const trimmed = name.trim();
+  if (trimmed.length === 0) return { error: "Name can't be empty." };
+  if (trimmed.length > MAX_SET_NAME_CHARS) return { error: `Keep the name under ${MAX_SET_NAME_CHARS} characters.` };
+
+  const profileId = await requireProfileId();
+  const set = await db.orm.public.PracticeSet.first({ id: setId, profileId });
+  if (!set) return { error: "Set not found." };
+
+  await db.orm.public.PracticeSet.where({ id: setId }).update({ name: trimmed });
+
+  revalidatePath("/sets");
+  revalidatePath(`/sets/${setId}`);
+  revalidatePath(`/sets/${setId}/results`);
+  revalidatePath("/problems");
+  revalidatePath("/");
+  return { ok: true };
+}
+
+export async function deleteSet(setId: string): Promise<{ error: string } | { ok: true }> {
+  const profileId = await requireProfileId();
+  const set = await db.orm.public.PracticeSet.first({ id: setId, profileId });
+  if (!set) return { error: "Set not found." };
+  // /tests owns exam-mode deletion (if it ever ships one) — this action is
+  // reached only from /sets, which already filters to mode: "practice", but
+  // guard directly rather than trusting that filter never drifts.
+  if (set.mode !== "practice") return { error: "Practice tests can't be deleted from here." };
+
+  // Cascades to PracticeSetItem/Attempt/AttemptEvent via the contract's
+  // onDelete: Cascade — no manual child cleanup needed.
+  await db.orm.public.PracticeSet.where({ id: setId }).delete();
+
+  revalidatePath("/sets");
+  revalidatePath("/problems");
+  revalidatePath("/");
+  return { ok: true };
+}
+
 // ─── Hand-picked sets (src/app/problems) ────────────────────────────────
 // A set assembled question-by-question from the /problems browser, rather
 // than sampled from filter criteria. Same PracticeSet/PracticeSetItem

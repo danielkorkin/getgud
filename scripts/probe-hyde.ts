@@ -51,7 +51,7 @@ function chatModel() {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("OPENROUTER_API_KEY is not set.");
   const openrouter = createOpenRouter({ apiKey });
-  return openrouter(process.env.OPENROUTER_MODEL || "openai/gpt-5.6-luna");
+  return openrouter(process.env.OPENROUTER_MODEL || "openai/gpt-6-luna");
 }
 
 async function embedQuery(text: string): Promise<Float32Array> {

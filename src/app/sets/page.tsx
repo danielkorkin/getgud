@@ -6,6 +6,7 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SiteNav } from "@/components/site-nav";
+import { SetCardMenu } from "@/components/sets/set-card-menu";
 import { PlusIcon } from "@phosphor-icons/react/dist/ssr";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -60,22 +61,28 @@ export default async function SetsLibraryPage() {
                 : `/sets/${set.id}/results`;
             const pct = set.gradedCount > 0 ? Math.round((set.correctCount / set.gradedCount) * 100) : null;
             return (
-              <Link key={set.id} href={href} className="block">
-                <Card interactive>
-                  <CardHeader>
-                    <div className="flex items-center justify-between gap-2">
-                      <CardTitle className="text-base">{set.name}</CardTitle>
-                      <Badge variant={isEmptyDraft ? "secondary" : STATUS_VARIANT[set.status] ?? "secondary"}>
-                        {isEmptyDraft ? "Draft" : STATUS_LABEL[set.status] ?? set.status}
-                      </Badge>
-                    </div>
-                    <CardDescription>
-                      {set.assessment} · {set.questionCount} questions
-                      {pct !== null && ` · ${pct}% correct`}
-                    </CardDescription>
-                  </CardHeader>
-                </Card>
-              </Link>
+              // The card's own navigation and its rename/delete menu are
+              // siblings, not nested — a <button> inside an <a> is invalid
+              // HTML and would fire the navigation on every menu click too.
+              <Card key={set.id} interactive>
+                <CardHeader>
+                  <div className="flex items-start justify-between gap-2">
+                    <Link href={href} className="flex min-w-0 flex-1 flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <CardTitle className="min-w-0 truncate text-base">{set.name}</CardTitle>
+                        <Badge variant={isEmptyDraft ? "secondary" : STATUS_VARIANT[set.status] ?? "secondary"}>
+                          {isEmptyDraft ? "Draft" : STATUS_LABEL[set.status] ?? set.status}
+                        </Badge>
+                      </div>
+                      <CardDescription>
+                        {set.assessment} · {set.questionCount} questions
+                        {pct !== null && ` · ${pct}% correct`}
+                      </CardDescription>
+                    </Link>
+                    <SetCardMenu setId={set.id} name={set.name} />
+                  </div>
+                </CardHeader>
+              </Card>
             );
           })}
         </div>

@@ -24,7 +24,8 @@ rationale, and Strobi — a floating procedural-avatar coach that reacts to
 each submission, gives a one-line AI takeaway before you move on, and holds
 a progressive 3-level hint ladder (then a confirm-gated answer reveal) and a
 full post-answer chat, all with the model's reasoning turned off; a set
-library (`/sets`) and results screen (`/sets/[id]/results`); local
+library (`/sets`, rename/delete per card) and results screen
+(`/sets/[id]/results`); local
 cookie-based profiles (no auth); three API routes (`/api/hint` and
 `/api/coach` streaming, `/api/events` telemetry ingest); a second, formal
 practice mode —
@@ -247,6 +248,26 @@ instant a question is answered — pass `frozenMs` (from `SubmitAnswerResult`/
 entirely rather than continuing to tick while the student reads the
 rationale or chats with the coach. `Attempt.totalMs` was already tracked for
 analytics; this only had to expose it to the client and freeze the display.
+
+**Renaming/deleting a set** (`renameSet`/`deleteSet` in `src/actions/sets.ts`,
+surfaced by `SetCardMenu` on both `/sets` cards and the home page's
+in-progress/recent cards) re-derives ownership the same way every other
+action here does — `requireProfileId()` plus a `PracticeSet.first({id,
+profileId})` lookup, never trusting the id alone. `deleteSet` refuses
+`mode !== 'practice'` (exam-mode deletion, if it ever ships, is `/tests`'s
+concern, not this action's) and does no manual child cleanup: it relies
+entirely on the contract's `onDelete: Cascade` chain from `PracticeSet`
+down through `PracticeSetItem` to `Attempt`/`AttemptEvent`/`AttemptHint`.
+`SetCardMenu` renders as a **sibling** of the card's own `<Link>`, never
+nested inside it — a `<button>` inside an `<a>` is invalid HTML and would
+also fire the card's navigation on every menu click — which is why the
+card's click target on `/` and `/sets` is now just the title/description
+block rather than the whole `<Card>`; don't re-wrap the card in a `Link` to
+"simplify" this. The 80-character name cap is duplicated by necessity —
+`MAX_SET_NAME_CHARS` server-side and `maxLength={80}` on the rename
+`Input` — change both together or the server-side error path becomes
+unreachable from the UI.
+
 Rendering (MathML/LaTeX → KaTeX, sanitized) is `src/lib/content/render.ts` —
 see its file comment and `src/lib/content/latex-hygiene.ts` for the small,
 verified fixup pass it applies before handing LaTeX to KaTeX. `render.ts`
