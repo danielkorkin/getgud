@@ -5,10 +5,15 @@ import "server-only";
 
 import { db } from "@/prisma/db";
 import { getExam } from "@/exams";
-import { buildStatsBundle, type StatsBundle } from "@/lib/stats/aggregate";
+import { isPsat } from "@/exams/spec";
+import { buildStatsBundle, type ExamMeta, type StatsBundle } from "@/lib/stats/aggregate";
 
-function examName(examId: string): string {
-  return getExam(examId)?.name ?? examId;
+function examMeta(examId: string): ExamMeta {
+  const bp = getExam(examId);
+  // A blueprint removed from the registry after a session was taken falls
+  // back to the SAT scale, which is what every pre-PSAT session used.
+  if (!bp) return { name: examId, assessment: "SAT", sectionMin: 200, sectionMax: 800 };
+  return { name: bp.name, assessment: isPsat(bp) ? "PSAT" : "SAT", sectionMin: bp.scale.sectionMin, sectionMax: bp.scale.sectionMax };
 }
 
 export async function loadStatsBundle(profileId: string): Promise<StatsBundle> {
@@ -66,5 +71,5 @@ export async function loadStatsBundle(profileId: string): Promise<StatsBundle> {
       .all(),
   ]);
 
-  return buildStatsBundle({ sets, examSessions, attempts, examName });
+  return buildStatsBundle({ sets, examSessions, attempts, examMeta });
 }

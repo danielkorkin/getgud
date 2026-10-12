@@ -12,6 +12,8 @@
 
 import Link from "next/link";
 import { db } from "@/prisma/db";
+import { getExam } from "@/exams";
+import { totalScaleMax } from "@/exams/spec";
 import { getCurrentProfile } from "@/lib/profile";
 import { FEATURED_GUIDES, GUIDES, RESOURCES } from "@/resources";
 import { CreateProfileForm } from "@/components/practice/create-profile-form";
@@ -244,7 +246,9 @@ export default async function HomePage() {
                         <CardHeader>
                           <CardTitle className="text-base">{set.name}</CardTitle>
                           <CardDescription>
-                            {session?.totalScaled != null ? `${session.totalScaled} / 1600` : "Score unavailable"}
+                            {session?.totalScaled != null
+                              ? `${session.totalScaled} / ${totalScaleMax(getExam(session.examId) ?? { scale: { sectionMin: 200, sectionMax: 800 } })}`
+                              : "Score unavailable"}
                           </CardDescription>
                         </CardHeader>
                       </Card>

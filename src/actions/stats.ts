@@ -54,7 +54,7 @@ function toStatsSummaryInput(bundle: StatsBundle, chatExcerpts: ChatExcerpt[], q
       .slice(0, 5)
       .map((s) => ({ skillCode: s.skillCode, skillLabel: s.skillLabel, triedWrong: s.triedWrong, rushedWrongCount: s.rushedWrongCount })),
     avgActiveMsOverall: bundle.headline.avgActiveMs,
-    examScoreTrend: (bundle.exam?.scoreTrend ?? []).map((e) => ({ totalScaled: e.totalScaled, completedAt: e.completedAt })),
+    examScoreTrend: (bundle.exam?.scoreTrend ?? []).map((e) => ({ totalScaled: e.totalScaled, totalMax: e.totalMax, assessment: e.assessment, completedAt: e.completedAt })),
     recentInsights: insights.map((i) => i.text),
     chatExcerpts,
     questionDetails,

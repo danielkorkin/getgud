@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/prisma/db";
 import { getCurrentProfile } from "@/lib/profile";
 import { EXAMS, isExamVisible } from "@/exams";
+import { totalScaleMax } from "@/exams/spec";
 import { checkExamAvailability } from "@/lib/exam/availability";
 import { isBetweenSections, isExamPhase, isSectionOrder } from "@/lib/exam/phases";
 import { StartExamDialog } from "@/components/exam/start-exam-dialog";
@@ -84,7 +85,7 @@ export default async function TestsPage() {
                 )}
                 {status === "completed" && latest?.session.totalScaled != null && (
                   <p className="font-mono text-sm text-muted-foreground">
-                    Last score: <span className="font-medium text-foreground">{latest.session.totalScaled}</span> / 1600
+                    Last score: <span className="font-medium text-foreground">{latest.session.totalScaled}</span> / {totalScaleMax(bp)}
                   </p>
                 )}
                 {betweenSections && (
@@ -92,7 +93,7 @@ export default async function TestsPage() {
                     {SECTION_LABEL[finishedSection]}
                     {finishedScore != null && (
                       <>
-                        : <span className="font-mono font-medium text-foreground">{finishedScore}</span> / 800
+                        : <span className="font-mono font-medium text-foreground">{finishedScore}</span> / {bp.scale.sectionMax}
                       </>
                     )}{" "}
                     done — {SECTION_LABEL[remainingSection]} remaining.

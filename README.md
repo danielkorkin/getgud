@@ -20,10 +20,12 @@ that's saved per question and restored exactly as you left it — plus a set
 library (`/sets`), where any practice set can be renamed or deleted right
 from its card (also from the home page), a results screen, and local
 cookie-based profiles (no password). Alongside that, `/tests` offers full-length, timed, adaptive SAT
-practice tests — the same committed set of questions on every self-hosted
-copy of Getgud, with module-scoped timers, routing into an easier or harder
-second module based on first-module performance, and a scaled score out of
-1600 at the end. You can also choose which section to take first and, if you
+practice tests (two SAT tests and a PSAT/NMSQT test, structured and
+scored like the real digital exams) — the same committed set of questions on
+every self-hosted copy of Getgud, with module-scoped timers, routing into an
+easier or harder second module based on first-module performance, and a scaled
+score at the end (out of 1600 for the SAT, 1520 for the PSAT, plus the
+NMSC Selection Index). You can also choose which section to take first and, if you
 don't have time for both in one sitting, finish one section now and pick up
 the other later — your scaled score for a section shows up as soon as it's
 done, and the results page notes when a test was split across two sittings.

@@ -16,8 +16,10 @@ import { validateBlueprint, type ExamBlueprint } from "./spec";
 import { SAT_PRACTICE_1 } from "./sat-practice-1";
 import { SAT_PRACTICE_2 } from "./sat-practice-2";
 import { SAT_SMOKE } from "./sat-smoke";
+import { PSAT_PRACTICE_1 } from "./psat-practice-1";
+import { PSAT_SMOKE } from "./psat-smoke";
 
-const ALL_BLUEPRINTS: readonly ExamBlueprint[] = [SAT_PRACTICE_1, SAT_PRACTICE_2, SAT_SMOKE];
+const ALL_BLUEPRINTS: readonly ExamBlueprint[] = [SAT_PRACTICE_1, SAT_PRACTICE_2, SAT_SMOKE, PSAT_PRACTICE_1, PSAT_SMOKE];
 
 function assertRegistryInvariants(blueprints: readonly ExamBlueprint[]): void {
   for (const bp of blueprints) {
@@ -64,4 +66,4 @@ export const RESERVED_QUESTION_IDS: readonly string[] = [
   ...new Set(ALL_BLUEPRINTS.flatMap((bp) => bp.sections.flatMap((s) => [...s.module1, ...s.module2Lower, ...s.module2Upper]))),
 ];
 
-export type { ExamBlueprint, SectionBlueprint, ModuleSpec, Variant, ExamSectionCode } from "./spec";
+export type { ExamBlueprint, ExamAssessment, SectionBlueprint, ModuleSpec, Variant, ExamSectionCode } from "./spec";

@@ -11,14 +11,32 @@ const chartConfig: ChartConfig = {
   math: { label: "Math", color: "var(--chart-2)" },
 };
 
+/**
+ * One block per assessment: SAT (200-800 sections) and PSAT (160-760) are on
+ * different scales, so their scores are never drawn on one axis or trended
+ * against each other.
+ */
 export function ExamScoreChart({ data }: { data: ExamScorePoint[] }) {
   if (data.length === 0) return null;
+  const groups = new Map<string, ExamScorePoint[]>();
+  for (const point of data) groups.set(point.assessment, [...(groups.get(point.assessment) ?? []), point]);
+  return (
+    <div className="flex flex-col gap-8">
+      {[...groups.entries()].map(([assessment, points]) => (
+        <AssessmentScores key={assessment} assessment={assessment} data={points} showHeading={groups.size > 1} />
+      ))}
+    </div>
+  );
+}
+
+function AssessmentScores({ assessment, data, showHeading }: { assessment: string; data: ExamScorePoint[]; showHeading: boolean }) {
   const latest = data[data.length - 1];
 
   return (
     <div className="flex flex-col gap-3">
+      {showHeading && <h3 className="text-base font-medium tracking-tight">{assessment} practice tests</h3>}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <StatCard label="Latest total (out of 1600)" value={String(latest.totalScaled)} />
+        <StatCard label={`Latest total (out of ${latest.totalMax})`} value={String(latest.totalScaled)} />
         <StatCard label="Latest R&W" value={latest.rwScaled != null ? String(latest.rwScaled) : "—"} />
         <StatCard label="Latest Math" value={latest.mathScaled != null ? String(latest.mathScaled) : "—"} />
       </div>
@@ -39,7 +57,7 @@ export function ExamScoreChart({ data }: { data: ExamScorePoint[] }) {
                   axisLine={false}
                   tickFormatter={(v: string) => new Date(v).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                 />
-                <YAxis domain={[200, 800]} tickLine={false} axisLine={false} width={36} />
+                <YAxis domain={[latest.sectionMin, latest.sectionMax]} tickLine={false} axisLine={false} width={36} />
                 <ChartTooltip content={<ChartTooltipContent />} />
                 <ChartLegend content={<ChartLegendContent />} />
                 <Line type="monotone" dataKey="rwScaled" name="rw" stroke="var(--color-rw)" strokeWidth={2} dot isAnimationActive={false} />

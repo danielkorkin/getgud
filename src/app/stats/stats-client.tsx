@@ -50,8 +50,8 @@ export function StatsClient({ bundle, insights }: { bundle: StatsBundle; insight
   // is static) are combined across modes — see `PacingStats` in aggregate.ts —
   // so they get their own mode-agnostic section instead of either tab's list.
   const isPacingInsight = (i: Insight) => i.id.startsWith("pacing-risk") || i.id.startsWith("rushed-mistakes") || i.id === "mark-for-review";
-  const practiceInsights = insights.filter((i) => i.id !== "exam-trend" && !isPacingInsight(i));
-  const examInsights = insights.filter((i) => i.id === "exam-trend");
+  const practiceInsights = insights.filter((i) => !i.id.startsWith("exam-trend") && !isPacingInsight(i));
+  const examInsights = insights.filter((i) => i.id.startsWith("exam-trend"));
   const pacingInsights = insights.filter(isPacingInsight);
   const p = bundle.practice;
   const pacing = bundle.pacing;
@@ -68,7 +68,7 @@ export function StatsClient({ bundle, insights }: { bundle: StatsBundle; insight
         <StatCard label="Current streak" value={`${bundle.headline.currentStreakDays}d`} />
         <StatCard
           label="Latest test score"
-          value={bundle.headline.latestExamTotalScaled != null ? `${bundle.headline.latestExamTotalScaled}/1600` : "—"}
+          value={bundle.headline.latestExamTotalScaled != null ? `${bundle.headline.latestExamTotalScaled}/${bundle.headline.latestExamTotalMax ?? 1600}` : "—"}
         />
       </div>
 

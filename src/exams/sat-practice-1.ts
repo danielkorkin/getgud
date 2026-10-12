@@ -232,6 +232,7 @@ export const SAT_PRACTICE_1: ExamBlueprint = {
   id: "sat-practice-1",
   name: "SAT Practice Test 1",
   assessment: "SAT",
+  scale: { sectionMin: 200, sectionMax: 800 },
   breakMinutes: 10,
   sections: [
     {

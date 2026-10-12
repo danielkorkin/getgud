@@ -49,15 +49,36 @@ export interface SectionBlueprint {
   spec: { module1: ModuleSpec; module2Lower: ModuleSpec; module2Upper: ModuleSpec };
 }
 
+/** The `question_assessment.assessment` value a blueprint draws its questions (and difficulty bands) from. */
+export type ExamAssessment = "SAT" | "PSAT/NMSQT & PSAT 10";
+
 export interface ExamBlueprint {
   id: string;
   name: string;
-  assessment: "SAT";
+  assessment: ExamAssessment;
+  /** Per-section scaled-score range — SAT 200-800, PSAT/NMSQT & PSAT 10 160-760. Total is twice this. */
+  scale: { sectionMin: number; sectionMax: number };
   /** Excluded from /tests in production — see src/exams/sat-smoke.ts. */
   devOnly?: boolean;
   /** Minutes for the break between the RW section and the Math section. */
   breakMinutes: number;
   sections: readonly [SectionBlueprint, SectionBlueprint]; // [RW, MATH]
+}
+
+export function totalScaleMax(bp: Pick<ExamBlueprint, "scale">): number {
+  return bp.scale.sectionMax * 2;
+}
+
+export function isPsat(bp: Pick<ExamBlueprint, "assessment">): boolean {
+  return bp.assessment === "PSAT/NMSQT & PSAT 10";
+}
+
+/**
+ * NMSC Selection Index for the junior-year PSAT/NMSQT: (2 x RW + Math) / 10,
+ * 48-228 on the 160-760 section scale. Derived, never stored.
+ */
+export function nmscSelectionIndex(rwScaled: number, mathScaled: number): number {
+  return Math.round((2 * rwScaled + mathScaled) / 10);
 }
 
 export interface ValidationIssue {
@@ -103,6 +124,21 @@ export function validateBlueprint(bp: ExamBlueprint): ValidationIssue[] {
         path: `${where}.scaled.upper`,
         message: `length ${section.scaled.upper.length} !== expected ${expectedTableLength}`,
       });
+    }
+
+    for (const [key, table] of [
+      ["lower", section.scaled.lower],
+      ["upper", section.scaled.upper],
+    ] as const) {
+      for (let i = 0; i < table.length; i++) {
+        const v = table[i]!;
+        if (v < bp.scale.sectionMin || v > bp.scale.sectionMax) {
+          issues.push({ path: `${where}.scaled.${key}[${i}]`, message: `${v} outside scale ${bp.scale.sectionMin}-${bp.scale.sectionMax}` });
+        }
+        if (i > 0 && v < table[i - 1]!) {
+          issues.push({ path: `${where}.scaled.${key}[${i}]`, message: `table decreases (${table[i - 1]} -> ${v})` });
+        }
+      }
     }
 
     for (const id of section.module1) pushDup(id, `${where}.module1`);

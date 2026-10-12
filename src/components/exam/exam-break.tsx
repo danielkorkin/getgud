@@ -25,6 +25,7 @@ export function ExamBreak({
   justFinishedSection,
   nextSection,
   justFinishedScore,
+  sectionScaleMax,
   splitSitting,
   breakStartedAt,
   breakEndsAt,
@@ -36,6 +37,7 @@ export function ExamBreak({
   justFinishedSection: ExamSectionCode;
   nextSection: ExamSectionCode;
   justFinishedScore: number | null;
+  sectionScaleMax: number;
   splitSitting: boolean;
   breakStartedAt: string | null;
   breakEndsAt: string | null;
@@ -72,7 +74,7 @@ export function ExamBreak({
           </CardHeader>
           <CardContent>
             <p className="font-mono text-3xl font-medium">
-              {justFinishedScore} <span className="text-base font-normal text-muted-foreground">/ 800</span>
+              {justFinishedScore} <span className="text-base font-normal text-muted-foreground">/ {sectionScaleMax}</span>
             </p>
           </CardContent>
         </Card>

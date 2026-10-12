@@ -58,6 +58,8 @@ export interface ExamRunnerProps {
   sectionOrder: readonly [ExamSectionCode, ExamSectionCode];
   splitSitting: boolean;
   sectionScores: Partial<Record<ExamSectionCode, { variant: Variant; raw: number; scaled: number }>>;
+  /** Top of the blueprint's per-section scaled range (800 for SAT, 760 for PSAT). */
+  sectionScaleMax: number;
   breakStartedAt: string | null;
   breakEndsAt: string | null;
   initialPosition: number;
@@ -75,6 +77,7 @@ export function ExamRunner({
   sectionOrder,
   splitSitting,
   sectionScores,
+  sectionScaleMax,
   breakStartedAt,
   breakEndsAt,
   initialPosition,
@@ -477,6 +480,7 @@ export function ExamRunner({
               justFinishedSection={sectionOrder[0]}
               nextSection={sectionOrder[1]}
               justFinishedScore={sectionScores[sectionOrder[0]]?.scaled ?? null}
+              sectionScaleMax={sectionScaleMax}
               splitSitting={splitSitting}
               breakStartedAt={breakStartedAt}
               breakEndsAt={breakEndsAt}

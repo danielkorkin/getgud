@@ -646,22 +646,44 @@ export function practiceVolume(attempts: AttemptStatsRow[]): VolumeStats {
   return { byDate, currentStreakDays, longestStreakDays };
 }
 
+/** Per-exam facts the stats need beyond its name — SAT and PSAT scores sit on different scales and must never be compared. */
+export interface ExamMeta {
+  name: string;
+  /** Short family label: "SAT" or "PSAT". */
+  assessment: string;
+  sectionMin: number;
+  sectionMax: number;
+}
+
 export interface ExamScorePoint {
   completedAt: string;
   examId: string;
   examName: string;
+  assessment: string;
+  sectionMin: number;
+  sectionMax: number;
+  /** Top of the 2-section total (2 x sectionMax). */
+  totalMax: number;
   rwScaled: number | null;
   mathScaled: number | null;
   totalScaled: number;
 }
 
-export function examScoreTrend(sessions: ExamSessionStatsRow[], examName: (examId: string) => string): ExamScorePoint[] {
+export function examScoreTrend(sessions: ExamSessionStatsRow[], examMeta: (examId: string) => ExamMeta): ExamScorePoint[] {
   return sessions
     .filter((s) => s.totalScaled != null && s.completedAt != null)
-    .map((s) => ({
+    .map((s) => {
+      const meta = examMeta(s.examId);
+      return { s, meta };
+    })
+    .map(({ s, meta }) => ({
       completedAt: s.completedAt!,
       examId: s.examId,
-      examName: examName(s.examId),
+      examName: meta.name,
+      assessment: meta.assessment,
+      sectionMin: meta.sectionMin,
+      sectionMax: meta.sectionMax,
+      totalMax: meta.sectionMax * 2,
       rwScaled: s.rwScaled,
       mathScaled: s.mathScaled,
       totalScaled: s.totalScaled!,
@@ -675,6 +697,8 @@ export interface HeadlineTiles {
   avgActiveMs: number;
   currentStreakDays: number;
   latestExamTotalScaled: number | null;
+  /** Maximum total for that latest test's scale (1600 SAT, 1520 PSAT) — null when there is none. */
+  latestExamTotalMax: number | null;
 }
 
 export interface PracticeStats {
@@ -739,7 +763,7 @@ export function buildStatsBundle(input: {
   sets: SetStatsRow[];
   examSessions: ExamSessionStatsRow[];
   attempts: AttemptStatsRow[];
-  examName: (examId: string) => string;
+  examMeta: (examId: string) => ExamMeta;
 }): StatsBundle {
   const modeBySetId = new Map(input.sets.map((s) => [s.id, s.mode]));
   const setNameById = new Map(input.sets.map((s) => [s.id, s.name]));
@@ -769,7 +793,7 @@ export function buildStatsBundle(input: {
           totalGraded: practiceGraded.length,
         };
 
-  const scoreTrend = examScoreTrend(input.examSessions, input.examName);
+  const scoreTrend = examScoreTrend(input.examSessions, input.examMeta);
   const exam: ExamStats | null = scoreTrend.length === 0 ? null : { scoreTrend, latest: scoreTrend[scoreTrend.length - 1] };
 
   const allGraded = input.attempts.filter(isGraded);
@@ -795,6 +819,7 @@ export function buildStatsBundle(input: {
         : 0,
     currentStreakDays: practiceVolume(input.attempts).currentStreakDays,
     latestExamTotalScaled: exam?.latest?.totalScaled ?? null,
+    latestExamTotalMax: exam?.latest?.totalMax ?? null,
   };
 
   return { headline, practice, exam, pacing };

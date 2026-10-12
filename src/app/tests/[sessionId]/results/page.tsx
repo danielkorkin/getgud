@@ -3,6 +3,7 @@ import { redirect, notFound } from "next/navigation";
 import { db } from "@/prisma/db";
 import { getCurrentProfile } from "@/lib/profile";
 import { loadExamState } from "@/lib/exam/state";
+import { isPsat, nmscSelectionIndex, totalScaleMax } from "@/exams/spec";
 import { domainLabel, skillLabel } from "@/lib/catalog";
 import { renderContentField } from "@/lib/content/render";
 import type { AnswerOption } from "@/lib/grading";
@@ -125,7 +126,7 @@ export default async function ExamResultsPage({ params }: PageProps<"/tests/[ses
         <Card>
           <CardHeader>
             <CardTitle className="font-mono text-4xl">{state.scores.totalScaled}</CardTitle>
-            <CardDescription>Total score (out of 1600)</CardDescription>
+            <CardDescription>Total score (out of {totalScaleMax(state.blueprint)})</CardDescription>
           </CardHeader>
         </Card>
         <Card>
@@ -151,6 +152,18 @@ export default async function ExamResultsPage({ params }: PageProps<"/tests/[ses
           </CardHeader>
         </Card>
       </div>
+
+      {isPsat(state.blueprint) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-mono text-3xl">{nmscSelectionIndex(state.scores.rwScaled, state.scores.mathScaled)}</CardTitle>
+            <CardDescription>
+              NMSC Selection Index (48–228) = (2 × Reading and Writing + Math) ÷ 10. Only the junior-year PSAT/NMSQT feeds National
+              Merit; this is the practice-test equivalent, not an official figure.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
 
       {bySkill.size > 0 && (
         <section className="flex flex-col gap-3">

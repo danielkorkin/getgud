@@ -42,7 +42,7 @@ export interface StatsSummaryInput {
    *  carelessness signal rather than a knowledge gap. */
   rushedMistakes: { skillCode: string; skillLabel: string; triedWrong: number; rushedWrongCount: number }[];
   avgActiveMsOverall: number;
-  examScoreTrend: { totalScaled: number; completedAt: string }[];
+  examScoreTrend: { totalScaled: number; totalMax: number; assessment: string; completedAt: string }[];
   recentInsights: string[];
   /** Excerpts from past post-answer coach chats — see chat-history.ts. Free
    *  text, so the model (not a rule) is what can actually notice a
@@ -156,7 +156,7 @@ export function buildRecommendationPrompt(input: StatsSummaryInput): { system: s
 
   const examLines =
     input.examScoreTrend.length > 0
-      ? input.examScoreTrend.map((e) => `- ${e.completedAt.slice(0, 10)}: ${e.totalScaled}/1600`).join("\n")
+      ? input.examScoreTrend.map((e) => `- ${e.completedAt.slice(0, 10)}: ${e.totalScaled}/${e.totalMax} (${e.assessment})`).join("\n")
       : "(no completed practice tests yet)";
 
   const insightLines = input.recentInsights.length > 0 ? input.recentInsights.map((t) => `- ${t}`).join("\n") : "(none)";
@@ -204,7 +204,7 @@ export function buildRecommendationPrompt(input: StatsSummaryInput): { system: s
     pacingLines,
     "\nRushed mistakes (wrong, but notably faster than normal pace):",
     rushedLines,
-    "\nPractice test score history (out of 1600):",
+    "\nPractice test score history (each score shows its own maximum; SAT is out of 1600 and PSAT out of 1520, so never compare an SAT score with a PSAT score):",
     examLines,
     "\nAlready-computed observations:",
     insightLines,

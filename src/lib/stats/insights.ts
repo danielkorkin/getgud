@@ -258,18 +258,23 @@ export function computeInsights(practice: PracticeStats | null, exam: ExamStats 
     }
   }
 
-  if (exam && exam.scoreTrend.length >= 2) {
-    const first = exam.scoreTrend[0];
-    const latest = exam.scoreTrend[exam.scoreTrend.length - 1];
-    const delta = latest.totalScaled - first.totalScaled;
-    if (delta !== 0) {
+  // One trend per assessment: an SAT 1200 followed by a PSAT 1150 is two
+  // different scales, not a drop, so scores are only ever compared within the
+  // same assessment (scoreTrend is already sorted by completion time).
+  if (exam) {
+    const byAssessment = new Map<string, typeof exam.scoreTrend>();
+    for (const point of exam.scoreTrend) byAssessment.set(point.assessment, [...(byAssessment.get(point.assessment) ?? []), point]);
+    for (const [assessment, points] of byAssessment) {
+      if (points.length < 2) continue;
+      const delta = points[points.length - 1].totalScaled - points[0].totalScaled;
+      if (delta === 0) continue;
       insights.push({
-        id: "exam-trend",
+        id: `exam-trend:${assessment}`,
         severity: delta > 0 ? "info" : "notice",
         text:
           delta > 0
-            ? `Your total score is up ${delta} points since your first practice test.`
-            : `Your total score is down ${Math.abs(delta)} points since your first practice test.`,
+            ? `Your total ${assessment} score is up ${delta} points since your first ${assessment} practice test.`
+            : `Your total ${assessment} score is down ${Math.abs(delta)} points since your first ${assessment} practice test.`,
       });
     }
   }

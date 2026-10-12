@@ -62,6 +62,29 @@ interface ModuleDesign {
    * A domain with no entry keeps today's rarity-based behavior untouched.
    */
   domainSkillTargets?: Record<string, Record<string, number>>;
+  /**
+   * Optional RW layout override: ordered skill groups. Each inner array is one
+   * contiguous block in the module; within a block, items sort by scoreBand
+   * ascending (then id). A block with several skills (e.g. ["BOU","FSS"])
+   * mixes them by difficulty, which is how the real test lays out Standard
+   * English Conventions. When unset, layout is domain order then band — what
+   * the SAT designs have always used.
+   */
+  skillOrder?: string[][];
+  /**
+   * Opt-in (RW only, no SPR): honor `domainSkillTargets` exactly instead of
+   * the rotation's best effort. Assigns skills to the domain's band slots
+   * rarest-skill-first, each to the open slot nearest a band where that skill
+   * actually has an available item, so a thin skill (e.g. Cross-Text
+   * Connections) isn't silently dropped. Unset, selection is unchanged.
+   */
+  strictSkillQuota?: boolean;
+  /**
+   * Optional MATH layout override: exact 1-indexed positions of the SPR items.
+   * Must have exactly as many entries as the module ends up with SPR picks,
+   * otherwise the proportional-tail default applies.
+   */
+  sprPositions?: number[];
 }
 
 function sumTargets(t: DomainBandTargets): number {
@@ -256,6 +279,83 @@ const SAT_PRACTICE_2_SECTIONS: Record<SectionCode, Record<ModuleName, ModuleDesi
   MATH: { module1: MATH_MODULE_1_V2, module2Lower: MATH_MODULE_2_LOWER_V2, module2Upper: MATH_MODULE_2_UPPER_V2 },
 };
 
+// ── psat-practice-1 ─────────────────────────────────────────────────────────
+// Digital PSAT/NMSQT & PSAT 10. Same module lengths/timing as the SAT, but:
+//   - MATH domain mix follows College Board's PSAT alignment table (Algebra
+//     ~35%, Advanced Math ~32.5%, PSDA ~20%, Geometry & Trig ~12.5%) rather
+//     than the SAT's 35/35/15/15: Module 1 is 8/7/4/3, each Module 2 is
+//     7/7/5/3 (section totals 15/14/9/6 of 44 = 34/32/20/14%).
+//   - RW keeps 8/7/7/5 (the same shares across the whole SAT Suite) but lays
+//     out by SKILL GROUP, ascending difficulty within each group — the real
+//     test's order — via `skillOrder`, instead of by domain.
+//   - MATH SPR items sit at 5,6,11,12,17,22 of 22 — College Board's official
+//     PSAT answer key puts them at 6,7,13,14,20,21,27 of 27 (6 per 22). The
+//     SPR items are picked at the difficulty of the position they occupy
+//     (`sprBandQuota`), so the module still ramps easy -> hard end to end.
+//   - Band curves reuse sat-practice-1's column shapes (scoreBand is
+//     PSAT-specific in the bank, so the curves stay meaningful).
+// The PSAT bank has no Q.G / S.D rows and its Q.F / S.C are PSAT-scoped, so
+// querying assessment = 'PSAT/NMSQT & PSAT 10' already enforces PSAT content.
+const PSAT_RW_SKILL_ORDER = [["WIC"], ["TSP"], ["CTC"], ["CID"], ["COE.T"], ["COE.Q"], ["INF"], ["BOU", "FSS"], ["TRA"], ["SYN"]];
+const PSAT_MATH_SPR_POSITIONS = [5, 6, 11, 12, 17, 22];
+
+function psatRw(base: ModuleDesign, secSkills: Record<string, number>, eoiSkills: Record<string, number>): ModuleDesign {
+  return {
+    ...base,
+    skillOrder: PSAT_RW_SKILL_ORDER,
+    strictSkillQuota: true,
+    domainSkillTargets: {
+      CAS: { WIC: 4, TSP: 3, CTC: 1 },
+      INI: { CID: 2, "COE.T": 1, "COE.Q": 2, INF: 2 },
+      SEC: secSkills,
+      EOI: eoiSkills,
+    },
+  };
+}
+const PSAT_MATH_DOMAIN_ORDER = MATH_DOMAIN_ORDER;
+const PSAT_MATH_MODULE_1: ModuleDesign = {
+  count: 22,
+  domainOrder: PSAT_MATH_DOMAIN_ORDER,
+  domainBandTargets: {
+    H: { 1: 1, 2: 1, 3: 1, 4: 2, 5: 1, 6: 1, 7: 1 }, // 8
+    P: { 1: 1, 2: 1, 3: 1, 4: 2, 5: 1, 7: 1 }, // 7
+    Q: { 2: 1, 4: 1, 5: 1, 6: 1 }, // 4
+    S: { 3: 1, 4: 1, 5: 1 }, // 3
+  },
+  sprPositions: PSAT_MATH_SPR_POSITIONS,
+};
+const PSAT_MATH_MODULE_2_LOWER: ModuleDesign = {
+  count: 22,
+  domainOrder: PSAT_MATH_DOMAIN_ORDER,
+  domainBandTargets: {
+    H: { 1: 2, 2: 2, 3: 1, 4: 1, 5: 1 }, // 7
+    P: { 1: 2, 2: 2, 3: 1, 4: 1, 5: 1 }, // 7
+    Q: { 1: 1, 2: 1, 3: 1, 4: 2 }, // 5
+    S: { 1: 1, 2: 1, 3: 1 }, // 3
+  },
+  sprPositions: PSAT_MATH_SPR_POSITIONS,
+};
+const PSAT_MATH_MODULE_2_UPPER: ModuleDesign = {
+  count: 22,
+  domainOrder: PSAT_MATH_DOMAIN_ORDER,
+  domainBandTargets: {
+    H: { 3: 1, 4: 1, 5: 1, 6: 2, 7: 2 }, // 7
+    P: { 4: 1, 5: 1, 6: 2, 7: 3 }, // 7
+    Q: { 4: 1, 5: 1, 6: 1, 7: 2 }, // 5
+    S: { 4: 1, 5: 1, 6: 1 }, // 3
+  },
+  sprPositions: PSAT_MATH_SPR_POSITIONS,
+};
+
+const PSAT_PRACTICE_1_SECTIONS: Record<SectionCode, Record<ModuleName, ModuleDesign>> = {
+  RW: {
+    module1: psatRw(RW_MODULE_1, { BOU: 4, FSS: 3 }, { TRA: 2, SYN: 3 }),
+    module2Lower: psatRw(RW_MODULE_2_LOWER, { BOU: 3, FSS: 4 }, { TRA: 3, SYN: 2 }),
+    module2Upper: psatRw(RW_MODULE_2_UPPER, { BOU: 3, FSS: 4 }, { TRA: 3, SYN: 2 }),
+  },
+  MATH: { module1: PSAT_MATH_MODULE_1, module2Lower: PSAT_MATH_MODULE_2_LOWER, module2Upper: PSAT_MATH_MODULE_2_UPPER },
+};
+
 // Design intent, keyed by exam id — NOT a CLI parameter (see the module
 // comment). `sat-practice-1`'s entry is untouched by the sat-practice-2 work
 // above; regenerating it with the same seed must still reproduce the exact
@@ -263,7 +363,18 @@ const SAT_PRACTICE_2_SECTIONS: Record<SectionCode, Record<ModuleName, ModuleDesi
 const DESIGNS: Record<string, Record<SectionCode, Record<ModuleName, ModuleDesign>>> = {
   "sat-practice-1": SAT_PRACTICE_1_SECTIONS,
   "sat-practice-2": SAT_PRACTICE_2_SECTIONS,
+  "psat-practice-1": PSAT_PRACTICE_1_SECTIONS,
 };
+
+// Which `question_assessment.assessment` each design draws from. Anything not
+// listed here is an SAT design — the original (and only) behavior.
+const PSAT = "PSAT/NMSQT & PSAT 10";
+const DESIGN_ASSESSMENT: Record<string, string> = {
+  "psat-practice-1": PSAT,
+};
+function assessmentFor(examId: string): string {
+  return DESIGN_ASSESSMENT[examId] ?? "SAT";
+}
 
 // Sanity-check the hand-authored designs at load time — a typo here would
 // otherwise silently produce a module short of its contractual count, or a
@@ -303,7 +414,12 @@ function parseArgs(argv: string[]): { exam: string; seed: string; verify: boolea
   return { exam, seed, verify };
 }
 
-async function fetchCandidates(sectionCode: SectionCode, seed: string, excludeIds: readonly string[]): Promise<Candidate[]> {
+async function fetchCandidates(
+  sectionCode: SectionCode,
+  seed: string,
+  excludeIds: readonly string[],
+  assessment: string,
+): Promise<Candidate[]> {
   // Excludes every id already claimed by a DIFFERENT registered blueprint
   // (src/exams/index.ts) — load-bearing when designing a SECOND (or later)
   // exam: without this, the selection could reuse an id from
@@ -322,10 +438,11 @@ async function fetchCandidates(sectionCode: SectionCode, seed: string, excludeId
         qa."skillCode",
         qa."scoreBand",
         q."templateClusterId",
-        q."parentTemplateId"
+        q."parentTemplateId",
+        (q.stimulus ~* '<table|<svg|<img|<figure') AS quantitative
       FROM question q
       JOIN question_assessment qa ON qa."questionId" = q.id
-      WHERE qa.assessment = 'SAT'
+      WHERE qa.assessment = ${assessment}
         AND qa."sectionCode" = ${sectionCode}
         AND cardinality(q."correctAnswer") > 0
         AND q.rationale IS NOT NULL
@@ -341,14 +458,20 @@ async function fetchCandidates(sectionCode: SectionCode, seed: string, excludeId
       scoreBand: "pg/int4@1",
       templateClusterId: "pg/text@1",
       parentTemplateId: "pg/text@1",
+      quantitative: "pg/bool@1",
     } as const)
     .build();
   const rows = await db.runtime().query(plan);
+  // PSAT designs split Command of Evidence into textual (COE.T) and
+  // quantitative/graphic (COE.Q) pseudo-skills, because the real test places
+  // all textual items before all quantitative ones. SAT designs never
+  // reference these keys, so they keep the raw skill code.
+  const splitCoe = assessment === PSAT;
   return rows.map((r) => ({
     id: r.id,
     type: r.type as "mcq" | "spr",
     domainCode: r.domainCode,
-    skillCode: r.skillCode,
+    skillCode: splitCoe && r.skillCode === "COE" ? (r.quantitative ? "COE.Q" : "COE.T") : r.skillCode,
     scoreBand: r.scoreBand,
     templateClusterId: r.templateClusterId,
     parentTemplateId: r.parentTemplateId,
@@ -438,6 +561,80 @@ interface PickResult {
   short: string[];
 }
 
+/**
+ * Strict skill-quota pick for one domain (see ModuleDesign.strictSkillQuota).
+ * Band slots come from `bandTargets`; every skill's quota is placed into a
+ * slot before any item is chosen, so scarcity decides placement, not rotation
+ * order.
+ */
+function pickStrictQuota(
+  pool: Candidate[],
+  domain: string,
+  bandTargets: Partial<Record<number, number>>,
+  skillTargets: Record<string, number>,
+  state: SelectionState,
+): PickResult {
+  const slots: { band: number; skill: string | null }[] = [];
+  for (const band of Object.keys(bandTargets).map(Number).sort((a, b) => a - b)) {
+    for (let i = 0; i < (bandTargets[band] ?? 0); i++) slots.push({ band, skill: null });
+  }
+  const supply = (skill: string) => pool.filter((c) => c.domainCode === domain && c.skillCode === skill && isAvailable(c, state));
+  const skills = Object.keys(skillTargets).sort();
+  const supplyBands = new Map(skills.map((sk) => [sk, new Set(supply(sk).map((c) => c.scoreBand))]));
+  const supplySize = new Map(skills.map((sk) => [sk, supply(sk).length]));
+  const remaining = new Map(skills.map((sk) => [sk, skillTargets[sk] ?? 0]));
+  const issued = new Map(skills.map((sk) => [sk, 0]));
+  // Walk the slots easiest-to-hardest and give each to whichever skill is
+  // furthest behind its quota (issued/target) among skills that have an item at
+  // that exact band — so skills interleave across the difficulty range instead
+  // of clumping. A skill whose remaining quota equals the number of open slots
+  // it can still fill is forced first (this is what keeps a thin skill, e.g.
+  // Cross-Text Connections, from being squeezed out). If nothing has supply at
+  // a slot's band, the skill with the nearest supply band takes it.
+  slots.forEach((slot, idx) => {
+    const open = slots.slice(idx);
+    const eligible = skills.filter((sk) => (remaining.get(sk) ?? 0) > 0);
+    const has = (sk: string, band: number) => supplyBands.get(sk)!.has(band);
+    const feasible = (sk: string) => open.filter((o) => has(sk, o.band)).length;
+    const forced = eligible.filter((sk) => has(sk, slot.band) && feasible(sk) <= (remaining.get(sk) ?? 0));
+    let candidates = forced.length > 0 ? forced : eligible.filter((sk) => has(sk, slot.band));
+    if (candidates.length === 0) {
+      const dist = (sk: string) => Math.min(...[...supplyBands.get(sk)!].map((b) => Math.abs(b - slot.band)), 99);
+      const best = Math.min(...eligible.map(dist));
+      candidates = eligible.filter((sk) => dist(sk) === best);
+    }
+    candidates.sort(
+      (x, y) =>
+        (issued.get(x)! / skillTargets[x]!) - (issued.get(y)! / skillTargets[y]!) ||
+        supplySize.get(x)! - supplySize.get(y)! ||
+        x.localeCompare(y),
+    );
+    const chosen = candidates[0]!;
+    slot.skill = chosen;
+    remaining.set(chosen, remaining.get(chosen)! - 1);
+    issued.set(chosen, issued.get(chosen)! + 1);
+  });
+  const picked: Candidate[] = [];
+  const short: string[] = [];
+  for (const slot of slots) {
+    let candidate: Candidate | null = null;
+    for (let delta = 0; delta <= 6 && !candidate; delta++) {
+      for (const b of delta === 0 ? [slot.band] : [slot.band - delta, slot.band + delta]) {
+        candidate =
+          pool.find((c) => c.domainCode === domain && c.skillCode === slot.skill && c.scoreBand === b && isAvailable(c, state)) ?? null;
+        if (candidate) break;
+      }
+    }
+    if (candidate) {
+      picked.push(candidate);
+      claim(candidate, state);
+    } else {
+      short.push(`${domain} ${slot.skill} band ${slot.band}`);
+    }
+  }
+  return { picked, short };
+}
+
 function pickForDomainBand(
   pool: Candidate[],
   domain: string,
@@ -513,8 +710,29 @@ interface ModuleResult {
   shortfalls: string[];
 }
 
+/**
+ * With explicit `sprPositions`, the SPR items must also fit the module's
+ * difficulty ramp: the item landing at an SPR position should have the band
+ * an ascending-by-difficulty module has at that position. Returns how many SPR
+ * items each band needs.
+ */
+function sprBandQuota(design: ModuleDesign): Record<number, number> {
+  const bands: number[] = [];
+  for (const byBand of Object.values(design.domainBandTargets)) {
+    for (const [band, count] of Object.entries(byBand)) for (let i = 0; i < (count ?? 0); i++) bands.push(Number(band));
+  }
+  bands.sort((a, b) => a - b);
+  const quota: Record<number, number> = {};
+  for (const pos of design.sprPositions ?? []) {
+    const b = bands[pos - 1]!;
+    quota[b] = (quota[b] ?? 0) + 1;
+  }
+  return quota;
+}
+
 function selectModule(pool: Candidate[], design: ModuleDesign, state: SelectionState): ModuleResult {
   const shortfalls: string[] = [];
+  const bandSprQuota = design.sprPositions ? sprBandQuota(design) : null;
   const selectedByDomain = new Map<string, Candidate[]>();
 
   for (const domain of design.domainOrder) {
@@ -531,12 +749,17 @@ function selectModule(pool: Candidate[], design: ModuleDesign, state: SelectionS
     const bands = Object.keys(bandTargets)
       .map(Number)
       .sort((a, b) => a - b);
-    for (const band of bands) {
+    if (design.strictSkillQuota && skillTargets) {
+      const { picked, short } = pickStrictQuota(pool, domain, bandTargets, skillTargets, state);
+      domainPicked.push(...picked);
+      shortfalls.push(...short);
+    }
+    for (const band of design.strictSkillQuota && skillTargets ? [] : bands) {
       const target = bandTargets[band] ?? 0;
       if (target === 0) continue;
       // Prefer SPR for however many of this band's slots are still needed
       // to hit the domain's SPR sub-quota; the rest prefer MCQ.
-      const sprHere = Math.min(sprStillNeeded, target);
+      const sprHere = bandSprQuota ? Math.min(bandSprQuota[band] ?? 0, target) : Math.min(sprStillNeeded, target);
       const { picked, short } = pickForDomainBand(pool, domain, band, target, state, false, rotation);
       // Re-split: if we got fewer SPRs than desired among `picked`, try
       // swapping an MCQ pick for an available SPR of the same domain+band.
@@ -569,6 +792,7 @@ function selectModule(pool: Candidate[], design: ModuleDesign, state: SelectionS
         }
       }
       sprStillNeeded -= gotSpr;
+      if (bandSprQuota) bandSprQuota[band] = Math.max(0, (bandSprQuota[band] ?? 0) - gotSpr);
       domainPicked.push(...picked);
       shortfalls.push(...short);
     }
@@ -598,13 +822,25 @@ function selectModule(pool: Candidate[], design: ModuleDesign, state: SelectionS
   //        official reference pattern this approximates).
   const isMath = design.domainOrder[0] === "H" || design.domainOrder[0] === "P";
   let ordered: Candidate[];
-  if (!isMath) {
+  if (!isMath && design.skillOrder) {
+    const all = design.domainOrder.flatMap((d) => selectedByDomain.get(d) ?? []);
+    const grouped = design.skillOrder.flatMap((group) =>
+      all.filter((c) => group.includes(c.skillCode)).sort((a, b) => a.scoreBand - b.scoreBand || a.id.localeCompare(b.id)),
+    );
+    const placed = new Set(grouped.map((c) => c.id));
+    const leftovers = all.filter((c) => !placed.has(c.id));
+    if (leftovers.length > 0) shortfalls.push(`layout: ${leftovers.length} pick(s) outside skillOrder appended at the end`);
+    ordered = [...grouped, ...leftovers];
+  } else if (!isMath) {
     ordered = design.domainOrder.flatMap((d) => (selectedByDomain.get(d) ?? []).sort((a, b) => a.scoreBand - b.scoreBand));
   } else {
     const all = design.domainOrder.flatMap((d) => selectedByDomain.get(d) ?? []);
     const mcq = all.filter((c) => c.type === "mcq").sort((a, b) => a.scoreBand - b.scoreBand);
     const spr = all.filter((c) => c.type === "spr").sort((a, b) => a.scoreBand - b.scoreBand);
-    ordered = interleaveSprAtProportionalTail(mcq, spr, design.count);
+    ordered =
+      design.sprPositions && design.sprPositions.length === spr.length
+        ? placeSprAtPositions(mcq, spr, design.count, design.sprPositions)
+        : interleaveSprAtProportionalTail(mcq, spr, design.count);
   }
 
   return { ids: ordered.map((c) => c.id), candidates: ordered, shortfalls };
@@ -646,6 +882,20 @@ function interleaveSprAtProportionalTail(mcq: Candidate[], spr: Candidate[], tot
   return result.filter((c): c is Candidate => c !== null);
 }
 
+/** Places `spr` (ascending band) at exact 1-indexed `positions`, filling the rest with `mcq` (ascending band). */
+function placeSprAtPositions(mcq: Candidate[], spr: Candidate[], total: number, positions: number[]): Candidate[] {
+  const slots = new Set(positions.map((p) => p - 1));
+  const sortedPositions = [...positions].sort((a, b) => a - b);
+  const result: Candidate[] = [];
+  let m = 0;
+  for (let i = 0; i < total; i++) {
+    const sprIndex = sortedPositions.indexOf(i + 1);
+    if (slots.has(i) && sprIndex >= 0) result.push(spr[sprIndex]!);
+    else if (mcq[m]) result.push(mcq[m++]!);
+  }
+  return result;
+}
+
 function printSummary(sectionCode: SectionCode, moduleName: ModuleName, result: ModuleResult): void {
   console.log(`\n-- ${sectionCode} ${moduleName} (${result.ids.length} questions) --`);
   const byDomainSkillBandType = new Map<string, number>();
@@ -679,7 +929,22 @@ async function runDesign(examId: string, seed: string): Promise<void> {
   // excludes every currently-reserved id.
   const existing = getExam(examId);
   const ownIds = new Set(existing ? existing.sections.flatMap((s) => [...s.module1, ...s.module2Lower, ...s.module2Upper]) : []);
-  const excludeIds = RESERVED_QUESTION_IDS.filter((id) => !ownIds.has(id));
+  // Re-designing a registered exam must keep reproducing its committed ids even
+  // after LATER exams are registered. Those later exams may legitimately claim
+  // ids that this exam also draws on (the SAT and PSAT banks share ~3,500
+  // questions), and excluding them would silently shift this exam's picks. So
+  // only exams that already existed when this one was designed are excluded:
+  // same-assessment exams (any position) plus exams registered earlier. A
+  // brand-new exam excludes everything reserved.
+  let excludeIds: string[];
+  if (existing) {
+    const myIndex = EXAMS.indexOf(existing);
+    const blocking = EXAMS.filter((e, i) => e !== existing && (e.assessment === existing.assessment || i < myIndex));
+    const blockingIds = new Set(blocking.flatMap((e) => e.sections.flatMap((sec) => [...sec.module1, ...sec.module2Lower, ...sec.module2Upper])));
+    excludeIds = [...blockingIds];
+  } else {
+    excludeIds = RESERVED_QUESTION_IDS.filter((id) => !ownIds.has(id));
+  }
   console.log(
     existing
       ? `Redesigning already-registered exam "${examId}" — its own ${ownIds.size} ids stay eligible; ${excludeIds.length} ids from other exams are excluded.`
@@ -693,7 +958,7 @@ async function runDesign(examId: string, seed: string): Promise<void> {
   };
 
   for (const sectionCode of ["RW", "MATH"] as const) {
-    const pool = await fetchCandidates(sectionCode, seed, excludeIds);
+    const pool = await fetchCandidates(sectionCode, seed, excludeIds, assessmentFor(examId));
     console.log(`\n=== ${sectionCode}: ${pool.length} eligible candidates ===`);
     for (const moduleName of ["module1", "module2Lower", "module2Upper"] as const) {
       const design = sections[sectionCode][moduleName];
@@ -758,7 +1023,7 @@ async function runVerify(): Promise<void> {
         }
         const placements = await db.orm.public.QuestionAssessment
           .where((qa) => qa.questionId.in([...ids]))
-          .where({ assessment: "SAT" })
+          .where({ assessment: bp.assessment })
           .all();
         const wrongSection = placements.filter((p) => p.sectionCode !== section.sectionCode);
         check(`${section.sectionCode}.${moduleName}: all placements match section`, wrongSection.length === 0);

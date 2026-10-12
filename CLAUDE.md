@@ -29,7 +29,7 @@ library (`/sets`, rename/delete per card) and results screen
 cookie-based profiles (no auth); three API routes (`/api/hint` and
 `/api/coach` streaming, `/api/events` telemetry ingest); a second, formal
 practice mode —
-premade, full-length, timed, adaptive SAT practice tests (`/tests`,
+premade, full-length, timed, adaptive SAT and PSAT practice tests (`/tests`,
 `/tests/[sessionId]`, `/tests/[sessionId]/results`) that are identical on
 every self-hosted instance, letting a student choose which section goes
 first and optionally take the two sections in separate sittings, with a
@@ -409,6 +409,40 @@ itself the College Board natural key, so the same ids resolve to the same
 questions on any instance that scraped the same bank — see the header
 comment in `src/exams/index.ts`.
 
+**A blueprint declares its own assessment and score scale**
+(`ExamBlueprint.assessment` is `"SAT"` or `"PSAT/NMSQT & PSAT 10"`;
+`scale: { sectionMin, sectionMax }` is 200–800 for the SAT, 160–760 for the
+PSAT, total = 2 × max). Never hard-code `/1600` or `/800` — read the
+blueprint (`totalScaleMax(bp)`, `bp.scale.sectionMax`; where only a session
+is at hand, `getExam(session.examId)`, as `load.ts` does). The PSAT test
+(`src/exams/psat-practice-1.ts`, plus the dev-only `psat-smoke.ts`) also
+shows the NMSC Selection Index, `(2×RW + Math)/10` (48–228), derived at
+render time by `nmscSelectionIndex` in `spec.ts` and never stored. `/stats`
+keeps SAT and PSAT trends apart (`ExamScorePoint.assessment`; one chart block
+and one `exam-trend:<assessment>` insight per assessment) because an SAT 1200
+followed by a PSAT 1150 is two scales, not a drop.
+
+**How the PSAT test differs from the SAT ones, and why** (all documented in
+`psat-practice-1.ts`'s header; every new design knob is opt-in, so
+`sat-practice-1/2` still regenerate byte-identically — re-check that after any
+`design-exam.ts` change): the module lengths/timing are the same (27/27 RW,
+22/22 Math); the Math domain mix follows College Board's PSAT alignment table
+(Algebra ~35%, Advanced Math ~32.5%, PSDA ~20%, Geometry & Trig ~12.5% →
+8/7/4/3 in Module 1, 7/7/5/3 in each Module 2); RW is laid out by **skill
+group** with difficulty ascending inside each group (`skillOrder`; Boundaries
+and Form/Structure/Sense share one group so they mix by difficulty; Command of
+Evidence splits into textual `COE.T` then quantitative `COE.Q`); Math SPR items
+sit at exact positions (`sprPositions`, 5/6/11/12/17/22) and are picked at the
+difficulty of the position they fill (`sprBandQuota`) so the module still
+ramps easy → hard; `strictSkillQuota` honors a domain's skill quotas exactly,
+which the older rotation only did on a best-effort basis. Scaled-score tables
+average College Board's three official paper-form PSAT/NMSQT scoring guides;
+the lower-path cap has no official PSAT anchor (method in the file comment).
+Because the SAT and PSAT banks share ~3,500 questions, a PSAT blueprint's ids
+are reserved out of `/new` for SAT sets too, and `design-exam.ts` re-designs a
+*registered* exam excluding only same-assessment exams plus exams registered
+earlier — so registering a newer exam never shifts an older exam's picks.
+
 Linked from `/` (a "Practice tests" header button plus a "Practice tests"
 section next to "Recent sets") and from `/sets` (a matching header button);
 `/tests` links back with "Practice sets" and "Home". **This repo has no
@@ -523,13 +557,13 @@ repeat. Follow it in order — each step depends on the last:
    `domainBandTargets` sums to its module's `count`. If you're adding a
    second **SAT** blueprint with the same shape (27/27/22/22, same official
    percentages), you can run the script as-is — it already excludes
-   `sat-practice-1`'s ids automatically. If you're designing a **PSAT**
-   test or a structurally different SAT test, you'll need to param­eterize
-   these constants by exam id first (they're currently written for one
-   design at a time) — check `program`/`assessment` in `question_assessment`
-   for the PSAT case (`'PSAT/NMSQT & PSAT 10'` / `'P10'`), and re-derive the
-   module/timing numbers from the digital PSAT's own published spec, not
-   the SAT's — do not assume they're identical.
+   `sat-practice-1`'s ids automatically. For a second **PSAT** test, copy
+   `DESIGNS["psat-practice-1"]` under a new key and add the exam id to
+   `DESIGN_ASSESSMENT` (the script's SQL and `--verify` read the assessment
+   from there / from the blueprint) — its Math domain mix, RW skill-group
+   layout and SPR positions already follow the digital PSAT. A
+   structurally different test still needs its own `DESIGNS` entry; re-derive
+   module/timing numbers from that test's own published spec.
 3. **Run the selection**: `pnpm design:exam --exam=<id> --seed=getgud-<id>`.
    Use a seed that's unique per exam (e.g. `getgud-<id>` as shown) —
    reusing a seed across exams doesn't cause a collision (candidates are

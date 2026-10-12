@@ -37,6 +37,7 @@ export const SAT_SMOKE: ExamBlueprint = {
   id: "sat-smoke",
   name: "SAT Smoke Test (dev only)",
   assessment: "SAT",
+  scale: { sectionMin: 200, sectionMax: 800 },
   devOnly: true,
   breakMinutes: 1,
   sections: [
