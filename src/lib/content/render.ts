@@ -129,6 +129,19 @@ function cacheSet(key: string, value: string): void {
   }
 }
 
+const FIGURE_TAG_RE = /<(svg|img)\b/gi;
+
+/**
+ * Tag every College Board figure (inline `<svg>` graph, base64 `<img>`) with
+ * `data-qbank-figure` so globals.css can invert it in dark mode — these hard-
+ * code black strokes/text on a transparent background. Must run on the raw
+ * HTML, before `renderQbankMath`/`renderSaicMath`, so KaTeX's own generated
+ * `<svg>`s (which use `currentColor` and must NOT be inverted) never exist yet.
+ */
+function markFigures(html: string): string {
+  return html.replace(FIGURE_TAG_RE, "<$1 data-qbank-figure");
+}
+
 export interface RenderContentFieldInput {
   /** Raw HTML from `stem` / `stimulus` / `rationale` / one `answerOptions[].content`. Null-safe. */
   html: string | null | undefined;
@@ -151,7 +164,7 @@ export function renderContentField({ html, contentHash, field }: RenderContentFi
   const cached = cacheGet(key);
   if (cached !== undefined) return cached;
 
-  const withMath = renderSaicMath(renderQbankMath(html));
+  const withMath = renderSaicMath(renderQbankMath(markFigures(html)));
   const sanitized = DOMPurify.sanitize(withMath, {
     USE_PROFILES: { html: true, svg: true, svgFilters: true },
     // The 81 saic questions with a content figure embed it as a base64

@@ -276,7 +276,11 @@ stimulus/stem (real College Board markup — DOMPurify already lets it
 through, nothing generates it) in a `.qbank-table-wrap` scroll container and
 strips the legacy `border` attribute, so a wide data table doesn't overflow
 a narrow runner pane or double up borders with the `.qbank-table-wrap` rules
-in `globals.css`. Question generation/sampling is
+in `globals.css`. Figures (inline `<svg>` graphs, base64 `<img>`) are tagged
+`data-qbank-figure` by `markFigures` *before* the math passes and inverted
+under `.dark` in `globals.css` — they hard-code black on transparent. Don't
+swap this for a blanket `.dark svg` rule: it would also invert KaTeX's
+`currentColor` SVGs (sqrt signs, stretchy arrows) and icons. Question generation/sampling is
 `src/lib/query/generate-set.ts`.
 
 **`Attempt.id` always equals its `PracticeSetItem.id`, by convention, not a

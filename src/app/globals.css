@@ -275,6 +275,19 @@
    because a wide table (a 5+ column data set) would otherwise overflow a
    narrow runner pane or a phone-width viewport with no way to reach the
    remaining columns. */
+/* Figures (inline SVG graphs, base64 images) hard-code black on transparent,
+   which vanishes on the dark canvas. `render.ts`'s `markFigures` tags them;
+   invert + hue-rotate flips lightness but keeps series hues. 0.9 gives
+   off-white lines and a dark-gray (not pure white) PNG background. */
+.dark [data-qbank-figure] {
+  filter: invert(0.9) hue-rotate(180deg);
+}
+
+/* A nested figure would otherwise be inverted twice (= not at all). */
+.dark [data-qbank-figure] [data-qbank-figure] {
+  filter: none;
+}
+
 .qbank-table-wrap {
   overflow-x: auto;
   margin-block: 0.75rem;
