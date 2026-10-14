@@ -1,6 +1,6 @@
 import { streamText } from "ai";
 import { getOwnedItem } from "@/lib/access";
-import { getCoachModel, hintsConfigured, modelId } from "@/lib/ai/hint-provider";
+import { aiNotConfiguredMessage, getCoachModel, hintsConfigured, modelId } from "@/lib/ai/hint-provider";
 import { buildHintPrompt } from "@/lib/ai/hint-prompt";
 import { db } from "@/prisma/db";
 import type { AnswerOption } from "@/lib/grading";
@@ -35,7 +35,7 @@ async function recordHintUsage(attemptId: string, questionId: string, level: num
 export async function POST(request: Request): Promise<Response> {
   if (!hintsConfigured()) {
     return Response.json(
-      { error: "Hints aren't configured — set OPENROUTER_API_KEY to enable them." },
+      { error: aiNotConfiguredMessage("Hints") },
       { status: 503 },
     );
   }

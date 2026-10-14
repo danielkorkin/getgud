@@ -8,6 +8,7 @@ import { browseQuestions, countBrowseQuestions, type BrowseRow, type SimilarCont
 import { SIMILAR_POOL_SIZE, rankSimilar, similarSearchAvailable } from "@/lib/query/similar-questions";
 import { renderContentField } from "@/lib/content/render";
 import { hintsConfigured } from "@/lib/ai/hint-provider";
+import { embeddingsConfigured } from "@/lib/embeddings/core";
 import type { AnswerOption } from "@/lib/grading";
 import { SiteNav } from "@/components/site-nav";
 import { ProblemFilters } from "@/components/problems/problem-filters";
@@ -200,7 +201,7 @@ export default async function ProblemsPage({ searchParams }: PageProps<"/problem
   // problems" — hidden entirely rather than shown-and-erroring when
   // OPENROUTER_API_KEY isn't set or `pnpm embed` hasn't populated the
   // embedding table yet.
-  const smartAvailable = hintsConfigured() && embeddingsAvailable;
+  const smartAvailable = hintsConfigured() && embeddingsConfigured() && embeddingsAvailable;
 
   // Resolve similar-mode up front: the source question + its ranked
   // neighbours. Three distinct "nothing to show" states get their own copy

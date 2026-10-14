@@ -22,8 +22,26 @@
 
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import type { AnswerOption } from "@/lib/grading";
+import { createOllamaProvider, embeddingProvider, ollamaSettings } from "@/lib/ai/provider-config";
 
-export const EMBEDDING_MODEL = "google/gemini-embedding-2";
+export const OPENROUTER_EMBEDDING_MODEL = "google/gemini-embedding-2";
+
+/**
+ * The id stored in QuestionEmbedding.model and used to filter the index.
+ * Ollama models live under an `ollama/` prefix so they can never collide with
+ * an OpenRouter slug, and switching providers is additive (the table is keyed
+ * by model) — but you must re-run `pnpm embed` for the new id to have rows.
+ */
+export function embeddingModelId(): string {
+  return embeddingProvider() === "ollama"
+    ? `ollama/${ollamaSettings().embeddingModel}`
+    : OPENROUTER_EMBEDDING_MODEL;
+}
+
+/** Ollama needs no key; OpenRouter needs OPENROUTER_API_KEY. */
+export function embeddingsConfigured(): boolean {
+  return embeddingProvider() === "ollama" || Boolean(process.env.OPENROUTER_API_KEY);
+}
 export const EMBEDDING_TEXT_VARIANT = "full";
 export const EMBEDDING_DIM = 3072;
 
@@ -90,7 +108,10 @@ export function buildEmbeddingText(q: EmbeddableQuestion): string {
 }
 
 /** Own provider construction — deliberately not shared with hint-provider.ts (see file comment). */
-export function getEmbeddingModel(modelId: string = EMBEDDING_MODEL) {
+export function getEmbeddingModel(modelId: string = embeddingModelId()) {
+  if (embeddingProvider() === "ollama") {
+    return createOllamaProvider().embeddingModel(modelId.replace(/^ollama\//, ""));
+  }
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("OPENROUTER_API_KEY is not set.");
   const openrouter = createOpenRouter({ apiKey });

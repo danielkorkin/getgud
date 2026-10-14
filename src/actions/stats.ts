@@ -2,7 +2,7 @@
 
 import { generateObject } from "ai";
 import { requireProfileId } from "@/lib/profile";
-import { hintsConfigured, getAnalysisModel } from "@/lib/ai/hint-provider";
+import { aiNotConfiguredMessage, hintsConfigured, getAnalysisModel } from "@/lib/ai/hint-provider";
 import { buildRecommendationPrompt, type StatsSummaryInput } from "@/lib/ai/stats-prompt";
 import { AnalysisSchema, type Analysis } from "@/lib/ai/stats-schema";
 import { computeInsights } from "@/lib/stats/insights";
@@ -64,7 +64,7 @@ function toStatsSummaryInput(bundle: StatsBundle, chatExcerpts: ChatExcerpt[], q
 export async function analyzeStats(): Promise<{ analysis: Analysis } | { error: string }> {
   const profileId = await requireProfileId();
   if (!hintsConfigured()) {
-    return { error: "AI analysis isn't configured — set OPENROUTER_API_KEY to enable it." };
+    return { error: aiNotConfiguredMessage("AI analysis") };
   }
 
   const [bundle, chatExcerpts, questionDetails] = await Promise.all([

@@ -193,7 +193,8 @@ password), and build a set at `/new`.
 ### Optional API keys
 
 Both are optional — each feature degrades gracefully (disabled button with an
-explanation) if its key is unset:
+explanation) if its key is unset. (No key? Run the AI features locally
+instead — see "Running AI locally with Ollama" below.)
 
 - `OPENROUTER_API_KEY` — Strobi's hints, reaction takeaways, and post-answer
   chat, the Stats page's "Analyze my performance" feature, and (via a
@@ -202,6 +203,59 @@ explanation) if its key is unset:
   [OpenRouter](https://openrouter.ai/keys).
 - `NEXT_PUBLIC_DESMOS_API_KEY` — the runner's calculator, via a free key from
   [desmos.com/api](https://www.desmos.com/api).
+
+### Running AI locally with Ollama
+
+Every AI feature can run on a local [Ollama](https://ollama.com) model instead
+of OpenRouter — free, offline, and nothing leaves your machine. Chat and
+embeddings are chosen **independently**, so you can go fully local or mix
+(e.g. local chat, hosted embeddings).
+
+1. Install Ollama (`brew install ollama` on macOS, or see
+   [ollama.com/download](https://ollama.com/download)) and make sure it's
+   running (`ollama serve`, or the desktop app).
+2. Pull a chat model and, if you want "View similar problems" / Smart select,
+   an embedding model:
+
+   ```bash
+   ollama pull qwen3:8b          # chat: hints, coach, /stats analysis, Smart select re-rank
+   ollama pull embeddinggemma    # embeddings
+   ```
+
+3. Set these in `.env` (all documented in `.env.example`):
+
+   ```bash
+   AI_PROVIDER="ollama"
+   EMBEDDING_PROVIDER="ollama"
+   OLLAMA_MODEL="qwen3:8b"
+   OLLAMA_EMBEDDING_MODEL="embeddinggemma"
+   ```
+
+   | Variable | Default | What it does |
+   | --- | --- | --- |
+   | `AI_PROVIDER` | `openrouter` | `openrouter` or `ollama` — hints, coach, stats analysis, Smart select re-rank |
+   | `EMBEDDING_PROVIDER` | `openrouter` | `openrouter` or `ollama` — `pnpm embed`, similar problems, Smart select retrieval |
+   | `OLLAMA_BASE_URL` | `http://localhost:11434/api` | Ollama's native API (keep the `/api` suffix; point at another machine if needed) |
+   | `OLLAMA_MODEL` | `qwen3:8b` | Chat model tag, as shown by `ollama list` |
+   | `OLLAMA_EMBEDDING_MODEL` | `embeddinggemma` | Embedding model tag |
+   | `OLLAMA_NUM_CTX` | `16384` | Context window (tokens). Ollama's own default is small and silently truncates the long `/stats` and Smart select prompts |
+   | `OLLAMA_TEMPERATURE` | model default | Sampling temperature |
+   | `OLLAMA_COACH_THINK` | `false` | Thinking for hints/coach. Off keeps replies fast on reasoning models (qwen3, deepseek-r1…) |
+   | `OLLAMA_ANALYSIS_THINK` | model default | Thinking for `/stats` analysis and Smart select. `true`/`false` to force |
+   | `OLLAMA_OPTIONS` | empty | Any other native option as JSON, e.g. `{"top_k":40,"repeat_penalty":1.1}`; wins over the settings above |
+
+4. Restart `pnpm dev` (env is read at boot).
+5. If you enabled local embeddings, run `pnpm embed` once. Vectors are stored
+   per model id (`ollama/embeddinggemma` vs `google/gemini-embedding-2`), so
+   switching providers or models never overwrites the old ones — but a new
+   model has no vectors until you embed, and the similar-problems and Smart
+   select UI stays hidden until it does. Restart the dev server after
+   re-embedding against an existing database (the index is cached in memory).
+
+Notes: thinking models answer more slowly, and small models (≲4B) can fail the
+structured output `/stats` analysis and Smart select need — if those show an
+error, use a larger model. Any model tag you've pulled works; the picks above
+are just known-good starting points.
 
 ## Updating an existing install
 
@@ -228,7 +282,7 @@ and you have `OPENROUTER_API_KEY` set, run `pnpm embed` once to populate it
 - [Next.js](https://nextjs.org) (App Router, Server Actions)
 - [Prisma ORM](https://www.prisma.io) (v8, PostgreSQL)
 - [shadcn/ui](https://ui.shadcn.com) on [Base UI](https://base-ui.com), Tailwind CSS v4
-- [AI SDK](https://ai-sdk.dev) + [`@openrouter/ai-sdk-provider`](https://openrouter.ai) — streaming hints, takeaways, and chat
+- [AI SDK](https://ai-sdk.dev) + [`@openrouter/ai-sdk-provider`](https://openrouter.ai) or local [Ollama](https://ollama.com) via [`ollama-ai-provider-v2`](https://www.npmjs.com/package/ollama-ai-provider-v2) — streaming hints, takeaways, and chat
 - [KaTeX](https://katex.org) — server-side math rendering from MathML/LaTeX
 - [Recharts](https://recharts.org) — the `/stats` page's charts, via shadcn's `chart` wrapper
 - [Desmos API](https://www.desmos.com/api) — in-runner graphing/scientific calculator

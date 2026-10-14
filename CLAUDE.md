@@ -1021,6 +1021,30 @@ It is deliberately **not** rendered by the runners (`/sets/[id]`,
 `/tests/[sessionId]`): those are focused test-taking surfaces, and in exam
 mode the UI must not offer navigation out of a timed module.
 
+## AI providers (OpenRouter / Ollama)
+
+Chat and embeddings each pick a provider from `.env`, independently:
+`AI_PROVIDER` (hints, coach, `/stats` analysis, Smart select re-rank) and
+`EMBEDDING_PROVIDER` (`pnpm embed`, similar problems, Smart select
+retrieval), each `openrouter` (default) or `ollama`. Selection and all
+`OLLAMA_*` parsing live in `src/lib/ai/provider-config.ts`, which — like
+`embeddings/core.ts` — must stay free of `server-only` because `pnpm embed`
+runs under plain `tsx` (see "Why `core.ts` must never import from
+`hint-provider.ts`").
+
+`hint-provider.ts` keeps its original API (`hintsConfigured`, `modelId`,
+`getCoachModel`, `getAnalysisModel`); the Ollama branch wraps the model in
+`defaultSettingsMiddleware` so temperature, `think`, and native `options`
+(`num_ctx`, `OLLAMA_OPTIONS`) are applied once at the model and no call site
+knows which provider is active. It uses the native `/api` via
+`ollama-ai-provider-v2` rather than Ollama's OpenAI-compatible `/v1`, which
+can't set `num_ctx` (Ollama's default context silently truncates the stats/
+Smart select prompts). `embeddingModelId()` namespaces Ollama vectors as
+`ollama/<model>` in `QuestionEmbedding.model`, so switching is additive but
+needs a fresh `pnpm embed`; the `/new` and `/problems` Smart select gates
+also require `embeddingsConfigured()`. "Not configured" copy comes from
+`aiNotConfiguredMessage()` — don't hard-code a provider name in new gates.
+
 ## Statistics & AI analysis
 
 `/stats` aggregates a profile's **entire** history — every `PracticeSet` and

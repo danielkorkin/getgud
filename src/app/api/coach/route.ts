@@ -1,6 +1,6 @@
 import { streamText } from "ai";
 import { getOwnedItem } from "@/lib/access";
-import { getCoachModel, hintsConfigured } from "@/lib/ai/hint-provider";
+import { aiNotConfiguredMessage, getCoachModel, hintsConfigured } from "@/lib/ai/hint-provider";
 import { buildChatPrompt, buildSummaryPrompt, type CoachContextInput, type CoachMessage } from "@/lib/ai/coach-prompt";
 import { db } from "@/prisma/db";
 import type { AnswerOption } from "@/lib/grading";
@@ -18,7 +18,7 @@ interface CoachRequestBody {
 export async function POST(request: Request): Promise<Response> {
   if (!hintsConfigured()) {
     return Response.json(
-      { error: "The coach isn't configured — set OPENROUTER_API_KEY to enable it." },
+      { error: aiNotConfiguredMessage("The coach") },
       { status: 503 },
     );
   }

@@ -29,9 +29,11 @@ only re-run `pnpm convert:math` after editing
 `pnpm embed` (`scripts/embed-questions.ts`) is a fifth stage, separate from
 the four above in one important way: it reads **Postgres**, not `data/` — run
 it any time after `pnpm load` (and again after any `pnpm load`/`load:upsert`
-re-run that changes question content). Requires `OPENROUTER_API_KEY` in
-`.env`; embedding all ~3,767 questions costs about $0.15–0.20 with the
-default model (`google/gemini-embedding-2`) and takes a few minutes.
+re-run that changes question content). Uses whichever provider `EMBEDDING_PROVIDER` selects in `.env`:
+`openrouter` (default; requires `OPENROUTER_API_KEY`; ~3,767 questions cost
+about $0.15–0.20 with `google/gemini-embedding-2` and take a few minutes) or
+`ollama` (free, local; model from `OLLAMA_EMBEDDING_MODEL`, stored as
+`ollama/<model>` so it coexists with the OpenRouter vectors — see the README's "Running AI locally with Ollama").
 
 Resumable and idempotent like the rest of the pipeline: a question is
 skipped once it already has a stored embedding whose `contentHash` matches
@@ -40,7 +42,7 @@ actually changed. `--dry-run` prints the question/token/cost estimate
 without calling the API or writing anything; `--limit=N` caps how many get
 embedded; `--force` re-embeds everything regardless of `contentHash`.
 
-Without `OPENROUTER_API_KEY` set, `pnpm embed` simply isn't runnable (same
+Without a usable provider (no `OPENROUTER_API_KEY` and not `ollama`), `pnpm embed` simply isn't runnable (same
 posture as the hint/coach features) — the app works fine without it, it
 just means "View similar problems" doesn't appear anywhere in the UI
 (`similarSearchAvailable()` in `src/lib/query/similar-questions.ts` gates it

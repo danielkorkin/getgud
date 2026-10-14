@@ -28,7 +28,7 @@
 
 import { embed, generateText } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
-import { EMBEDDING_MODEL, buildEmbeddingIndex, getEmbeddingModel, l2Normalize } from "../src/lib/embeddings/core";
+import { embeddingModelId, buildEmbeddingIndex, getEmbeddingModel, l2Normalize } from "../src/lib/embeddings/core";
 
 const PROMPTS = [
   "passages that are poems with figurative language",
@@ -77,7 +77,7 @@ async function main() {
   const { db } = await import("../src/prisma/db");
   try {
     const rows = await db.orm.public.QuestionEmbedding.where({
-      model: EMBEDDING_MODEL,
+      model: embeddingModelId(),
       textVariant: "full",
     })
       .select("questionId", "dim", "vector")

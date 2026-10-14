@@ -8,7 +8,7 @@
 //            opens a database connection.
 // --limit=N: embed at most N questions (after skipping already-embedded ones).
 // --force:   re-embed every question even if a current-contentHash row exists.
-// --model:   override EMBEDDING_MODEL (src/lib/embeddings/core.ts).
+// --model:   override embeddingModelId() (src/lib/embeddings/core.ts).
 //
 // Resumable like `pnpm scrape`: a question is skipped when it already has a
 // QuestionEmbedding row for (model, textVariant) whose contentHash matches
@@ -18,7 +18,7 @@
 import { embedMany } from "ai";
 import {
   EMBEDDING_BATCH_SIZE,
-  EMBEDDING_MODEL,
+  embeddingModelId,
   EMBEDDING_TEXT_VARIANT,
   buildEmbeddingText,
   float32ToBytes,
@@ -35,7 +35,7 @@ interface Args {
 }
 
 function parseArgs(argv: string[]): Args {
-  const args: Args = { dryRun: false, limit: null, force: false, model: EMBEDDING_MODEL };
+  const args: Args = { dryRun: false, limit: null, force: false, model: embeddingModelId() };
   for (const arg of argv) {
     if (arg === "--dry-run") args.dryRun = true;
     else if (arg === "--force") args.force = true;

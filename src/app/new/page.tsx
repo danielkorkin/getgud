@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentProfile } from "@/lib/profile";
 import { hintsConfigured } from "@/lib/ai/hint-provider";
+import { embeddingsConfigured } from "@/lib/embeddings/core";
 import { similarSearchAvailable } from "@/lib/query/similar-questions";
 import { SetBuilderForm } from "@/components/set-builder/set-builder-form";
 import { SiteNav } from "@/components/site-nav";
@@ -12,7 +13,7 @@ export default async function NewSetPage() {
   // Same gating precedent as "View similar problems" — hidden entirely
   // rather than shown-and-erroring when OPENROUTER_API_KEY isn't set or
   // `pnpm embed` hasn't populated the embedding table yet.
-  const smartAvailable = hintsConfigured() && (await similarSearchAvailable());
+  const smartAvailable = hintsConfigured() && embeddingsConfigured() && (await similarSearchAvailable());
 
   return (
     <>

@@ -10,7 +10,7 @@
 import "server-only";
 import { db } from "@/prisma/db";
 import {
-  EMBEDDING_MODEL,
+  embeddingModelId,
   EMBEDDING_TEXT_VARIANT,
   buildEmbeddingIndex,
   type EmbeddingIndex,
@@ -40,7 +40,7 @@ async function getIndex(): Promise<EmbeddingIndex> {
   }
 
   const rows = await db.orm.public.QuestionEmbedding.where({
-    model: EMBEDDING_MODEL,
+    model: embeddingModelId(),
     textVariant: EMBEDDING_TEXT_VARIANT,
   })
     .select("questionId", "dim", "vector")

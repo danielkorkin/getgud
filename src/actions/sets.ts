@@ -14,7 +14,7 @@ import {
   type RawSetFilters,
   type SampledQuestion,
 } from "@/lib/query/generate-set";
-import { hintsConfigured } from "@/lib/ai/hint-provider";
+import { aiNotConfiguredMessage, hintsConfigured } from "@/lib/ai/hint-provider";
 import { similarSearchAvailable } from "@/lib/query/similar-questions";
 import { smartSelectFromPool, smartSelectQuestions, type SmartCandidate, type SmartPoolQuestion } from "@/lib/query/smart-select";
 import { listMatchingBrowseQuestions } from "@/lib/query/browse-questions";
@@ -147,7 +147,7 @@ export async function smartSelect(
   if (!validated.ok) return { error: validated.error };
 
   if (!hintsConfigured()) {
-    return { error: "Smart select isn't configured — set OPENROUTER_API_KEY to enable it." };
+    return { error: aiNotConfiguredMessage("Smart select") };
   }
   if (!(await similarSearchAvailable())) {
     return { error: "Smart select needs question embeddings — run `pnpm embed` first." };
@@ -498,7 +498,7 @@ export async function smartSearchProblems(
   }
 
   if (!hintsConfigured()) {
-    return { error: "Smart search isn't configured — set OPENROUTER_API_KEY to enable it." };
+    return { error: aiNotConfiguredMessage("Smart search") };
   }
   if (!(await similarSearchAvailable())) {
     return { error: "Smart search needs question embeddings — run `pnpm embed` first." };

@@ -118,13 +118,13 @@ export function HintLadder({
 
       {!hintsEnabled ? (
         <div className="flex flex-col gap-2 rounded-md bg-muted p-2.5 text-center text-xs text-muted-foreground">
-          <p>Hints need a free OpenRouter API key.</p>
+          <p>Hints need an AI provider.</p>
           <p>
-            Get one at{" "}
+            Set <code className="font-mono">OPENROUTER_API_KEY</code> (get one at{" "}
             <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" className="underline">
               openrouter.ai/keys
-            </a>{" "}
-            and set <code className="font-mono">OPENROUTER_API_KEY</code>.
+            </a>
+            ) or <code className="font-mono">AI_PROVIDER=ollama</code> for a local model — see the README.
           </p>
         </div>
       ) : !ladderDone ? (
@@ -244,13 +244,13 @@ export function CoachChat({
   if (!hintsEnabled) {
     return (
       <div className="flex flex-col gap-2 p-3 text-center text-xs text-muted-foreground">
-        <p>Chatting about this question needs a free OpenRouter API key.</p>
+        <p>Chatting about this question needs an AI provider.</p>
         <p>
-          Get one at{" "}
+          Set <code className="font-mono">OPENROUTER_API_KEY</code> (get one at{" "}
           <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" className="underline">
             openrouter.ai/keys
-          </a>{" "}
-          and set <code className="font-mono">OPENROUTER_API_KEY</code>.
+          </a>
+          ) or <code className="font-mono">AI_PROVIDER=ollama</code> for a local model — see the README.
         </p>
       </div>
     );
